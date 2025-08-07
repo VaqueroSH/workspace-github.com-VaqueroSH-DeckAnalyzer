@@ -77,17 +77,17 @@ class ScryfallAPI:
                 return card_info
                 
             elif response.status_code == 404:
-                print(f"Card not found: {card_name}")
+                # Card not found - silently return None for cleaner web interface
                 return None
             else:
-                print(f"API error for {card_name}: {response.status_code}")
+                # API error - silently return None for cleaner web interface
                 return None
                 
         except requests.RequestException as e:
-            print(f"Network error fetching {card_name}: {e}")
+            # Network error - silently return None for cleaner web interface
             return None
         except Exception as e:
-            print(f"Unexpected error fetching {card_name}: {e}")
+            # Unexpected error - silently return None for cleaner web interface
             return None
     
     def _get_card_from_set(self, card_name: str, set_code: str) -> Optional[CardInfo]:
@@ -165,11 +165,11 @@ class ScryfallAPI:
         for i, request in enumerate(card_requests, 1):
             if isinstance(request, tuple):
                 card_name, set_code = request
-                print(f"Fetching {i}/{total}: {card_name} ({set_code})")
+                # Progress reporting handled by Streamlit interface
                 results[card_name] = self.get_card(card_name, set_code)
             else:
                 card_name = request
-                print(f"Fetching {i}/{total}: {card_name}")
+                # Progress reporting handled by Streamlit interface
                 results[card_name] = self.get_card(card_name)
             
             # Rate limiting - don't delay after the last request
