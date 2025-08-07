@@ -1,0 +1,100 @@
+1 Agent's Toolkit
+1 Arcane Denial
+1 Arcane Signet
+1 Arid Mesa
+1 Barkchannel Pathway
+1 Birds of Paradise
+1 Bloodstained Mire
+1 Bonehoard Dracosaur
+1 Cavern of Souls
+1 Chrome Mox
+1 Command Tower
+1 Cresting Mosasaurus
+1 Cryptic Gateway
+1 Cultivate
+1 Cyclonic Rift
+1 Danny Pink
+1 Deflecting Swat
+1 Delighted Halfling
+1 Dino DNA
+1 Displaced Dinosaurs
+1 Dolmen Gate
+1 Earthshaker Dreadmaw
+1 Etali, Primal Conqueror
+1 Fanatic of Rhonas
+1 Fellwar Stone
+1 Fierce Guardianship
+2 Forest
+1 Garruk's Uprising
+1 Ghalta, Primal Hunger
+1 Ghalta, Stampede Tyrant
+1 Goldberry, River-Daughter
+1 Growing Rites of Itlimoc
+1 Herald's Horn
+1 Heroic Intervention
+1 Hinterland Harbor
+1 Hulking Raptor
+1 Hunting Velociraptor
+1 Invasion of Ikoria
+1 Island
+1 Ketria Triome
+1 Kindred Discovery
+1 Last March of the Ents
+1 Lightning Greaves
+1 Mana Vault
+1 Marauding Raptor
+1 Maze of Ith
+1 Mind Stone
+1 Misty Rainforest
+2 Mountain
+1 Mox Opal
+1 Mystic Remora
+1 Nature's Claim
+1 Nezahal, Primal Tide
+1 Patriar's Seal
+1 Pemmin's Aura
+1 Polluted Delta
+1 Polyraptor
+1 Quartzwood Crasher
+1 Ravenous Tyrannosaurus
+1 Realmwalker
+1 Rejuvenating Springs
+1 Reliquary Tower
+1 Return of the Wildspeaker
+1 Rhystic Study
+1 Rishkar's Expertise
+1 Roaming Throne
+1 Rogue's Passage
+1 Rootbound Crag
+1 Savage Order
+1 Scalding Tarn
+1 Scion of Calamity
+1 Secluded Courtyard
+1 Shivan Reef
+1 Slippery Bogbonder
+1 Sol Ring
+1 Sunfrill Imitator
+1 Taiga
+1 The Great Henge
+1 The Ozolith
+1 The Reaver Cleaver
+1 The Skullspore Nexus
+1 Thought Vessel
+1 Thrashing Brontodon
+1 Titanoth Rex
+1 Training Center
+1 Tropical Island
+1 Tyrite Sanctum
+1 Urza's Incubator
+1 Vaultborn Tyrant
+1 Verdant Catacombs
+1 Volcanic Island
+1 Warstorm Surge
+1 Welcome to . . .
+1 Windswept Heath
+1 Wooded Foothills
+1 Worldly Tutor
+1 Wrathful Raptors
+
+1 Blue, Loyal Raptor
+1 Owen Grady, Raptor Trainer
