@@ -51,6 +51,9 @@ class DeckStats:
     mana_curve: Dict[int, int]  # Mana value -> count
     average_mana_value: float
     
+    # Card type distribution
+    card_types: Dict[str, int]  # Card type -> count
+    
     # Card details for manual review
     missing_cards: List[str]  # Cards that couldn't be found
     
@@ -83,6 +86,21 @@ class DeckStats:
             else:
                 curve.append(f"{mana_value} CMC: {count} cards")
         return curve
+    
+    def get_card_type_summary(self) -> List[str]:
+        """Get a human-readable card type breakdown."""
+        if not self.card_types:
+            return ["No card type data available"]
+        
+        # Sort by count (descending) then by name
+        sorted_types = sorted(self.card_types.items(), key=lambda x: (-x[1], x[0]))
+        
+        summary = []
+        for card_type, count in sorted_types:
+            percentage = (count / self.unique_cards * 100) if self.unique_cards > 0 else 0
+            summary.append(f"{card_type}: {count} ({percentage:.1f}%)")
+        
+        return summary
 
 
 class DeckAnalyzer:
@@ -90,6 +108,40 @@ class DeckAnalyzer:
     
     def __init__(self, scryfall_api):
         self.api = scryfall_api
+    
+    def _parse_primary_type(self, type_line: str) -> str:
+        """
+        Extract the primary card type from a type line.
+        
+        Examples:
+        - "Legendary Creature — Human Noble" -> "Creature"
+        - "Instant" -> "Instant" 
+        - "Artifact — Equipment" -> "Artifact"
+        - "Basic Land — Swamp" -> "Land"
+        """
+        if not type_line:
+            return "Unknown"
+        
+        # Remove "Basic" prefix if present
+        type_line = type_line.replace("Basic ", "")
+        
+        # Split on — to separate main types from subtypes
+        main_types = type_line.split(" — ")[0]
+        
+        # Split on spaces and find the primary type
+        type_parts = main_types.split()
+        
+        # Common primary types (in order of priority for parsing)
+        primary_types = ["Land", "Creature", "Planeswalker", "Instant", "Sorcery", 
+                        "Artifact", "Enchantment", "Battle", "Tribal"]
+        
+        # Find the first matching primary type
+        for part in type_parts:
+            if part in primary_types:
+                return part
+        
+        # If no standard type found, return the first word (handles edge cases)
+        return type_parts[0] if type_parts else "Unknown"
     
     def analyze(self, deck: Deck) -> DeckStats:
         """
@@ -111,6 +163,7 @@ class DeckAnalyzer:
         lands = 0
         color_counts = defaultdict(int)
         mana_curve = defaultdict(int)
+        card_types = defaultdict(int)
         missing_cards = []
         total_mana_value = 0
         nonland_cards = 0
@@ -136,6 +189,10 @@ class DeckAnalyzer:
             # Color identity (count unique cards, not copies)
             for color in card_info.colors:
                 color_counts[color] += 1
+            
+            # Card type tracking (count unique cards, not copies)
+            primary_type = self._parse_primary_type(card_info.type_line)
+            card_types[primary_type] += 1
         
         # Calculate average mana value (nonlands only)
         avg_mana_value = total_mana_value / nonland_cards if nonland_cards > 0 else 0
@@ -149,6 +206,7 @@ class DeckAnalyzer:
             color_counts=dict(color_counts),
             mana_curve=dict(mana_curve),
             average_mana_value=avg_mana_value,
+            card_types=dict(card_types),
             missing_cards=missing_cards
         )
         

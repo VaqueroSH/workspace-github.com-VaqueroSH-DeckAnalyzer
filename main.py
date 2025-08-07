@@ -58,6 +58,19 @@ def print_deck_stats(stats):
     else:
         print("   No nonland cards to analyze")
     
+    # Card type distribution
+    print(f"\n🃏 CARD TYPE BREAKDOWN")
+    if stats.card_types:
+        # Sort by count (descending) then by name for consistent display
+        sorted_types = sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0]))
+        
+        for card_type, count in sorted_types:
+            percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+            bar = "█" * min(count, 20)  # Visual bar (max 20 chars)
+            print(f"   {card_type}: {count:2d} cards ({percentage:.1f}%) |{bar}")
+    else:
+        print("   No card type data available")
+    
     # Missing cards warning
     if stats.missing_cards:
         print(f"\n⚠️  MISSING CARDS")
