@@ -1,0 +1,100 @@
+1 Adeline, Resplendent Cathar
+1 An Offer You Can't Refuse
+1 Aragorn, King of Gondor
+1 Arcane Signet
+1 Arid Mesa
+1 Beregond of the Guard
+1 Boromir, Gondor's Hope
+1 Boromir, Warden of the Tower
+1 Breath of Fury
+1 Castle Ardenvale
+1 Cavern of Souls
+1 Champion of the Parish
+1 Chrome Mox
+1 Clifftop Retreat
+1 Combat Celebrant
+1 Command Tower
+1 Containment Priest
+1 Counterbalance
+1 Cyclonic Rift
+1 Dauntless Dismantler
+1 Deflecting Swat
+1 Drannith Magistrate
+1 Enlightened Tutor
+1 Éomer, King of Rohan
+1 Erkenbrand, Lord of Westfold
+1 Esper Sentinel
+1 Exotic Orchard
+1 Fellwar Stone
+1 Fierce Guardianship
+1 Flare of Fortitude
+1 Flawless Maneuver
+1 Flooded Strand
+1 Force of Negation
+1 Force of Will
+1 Gilraen, Dúnedain Protector
+1 Glacial Fortress
+1 Grand Abolisher
+1 Hallowed Fountain
+1 Heliod's Pilgrim
+1 Herald of Hoofbeats
+1 Imperial Recruiter
+5 Island
+1 Kiki-Jiki, Mirror Breaker
+1 Knight of the White Orchid
+1 Lavinia, Azorius Renegade
+1 Loran of the Third Path
+1 Lossarnach Captain
+1 Lotus Petal
+1 Luminarch Aspirant
+1 Mana Drain
+1 Mana Vault
+1 Mental Misstep
+1 Minas Tirith
+1 Mindbreak Trap
+1 Mother of Runes
+4 Mountain
+1 Mystic Remora
+1 Path of Ancestry
+1 Path to Exile
+5 Plains
+1 Plateau
+1 Powerbalance
+1 Prairie Stream
+1 Professional Face-Breaker
+1 Raise the Palisade
+1 Ranger-Captain of Eos
+1 Recruiter of the Guard
+1 Reprieve
+1 Rhystic Study
+1 Roaming Throne
+1 Sacred Foundry
+1 Scalding Tarn
+1 Secluded Courtyard
+1 Sensei's Divining Top
+1 Shared Animosity
+1 Smothering Tithe
+1 Sol Ring
+1 Steam Vents
+1 Sulfur Falls
+1 Supreme Verdict
+1 Swan Song
+1 Sword of Hearth and Home
+1 Sword of the Animist
+1 Swords to Plowshares
+1 Talisman of Creativity
+1 Talisman of Progress
+1 Teferi's Protection
+1 The One Ring
+1 Toby, Beastie Befriender
+1 Tundra
+1 Village Bell-Ringer
+1 Volcanic Island
+
+SIDEBOARD:
+1 Dawn of a New Age
+1 Gimli's Reckless Might
+1 Mox Opal
+1 Thalia's Lancers
+
+1 Éowyn, Shieldmaiden
