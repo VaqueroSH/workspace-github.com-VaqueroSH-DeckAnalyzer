@@ -11,8 +11,14 @@ from collections import defaultdict
 class Deck:
     """Represents a Magic: The Gathering deck."""
     cards: Dict[str, int]  # card_name -> quantity
+    card_sets: Dict[str, str] = None  # card_name -> set_code
     commander: Optional[str] = None
     name: Optional[str] = None
+    
+    def __post_init__(self):
+        """Initialize card_sets if not provided."""
+        if self.card_sets is None:
+            self.card_sets = {}
     
     @property
     def total_cards(self) -> int:
@@ -27,6 +33,14 @@ class Deck:
     def get_card_names(self) -> List[str]:
         """Get a list of all unique card names."""
         return list(self.cards.keys())
+    
+    def get_set_breakdown(self) -> Dict[str, int]:
+        """Get breakdown of cards by set."""
+        set_counts = defaultdict(int)
+        for card_name, quantity in self.cards.items():
+            set_code = self.card_sets.get(card_name, 'Unknown')
+            set_counts[set_code] += quantity
+        return dict(set_counts)
 
 
 @dataclass
@@ -53,6 +67,21 @@ class DeckStats:
     
     # Card type distribution
     card_types: Dict[str, int]  # Card type -> count
+    
+    # Price analysis
+    total_deck_value: float
+    most_expensive_cards: List[tuple]  # [(name, price), ...]
+    
+    # Rarity breakdown
+    rarity_counts: Dict[str, int]  # Rarity -> count
+    
+    # Interaction suite
+    interaction_counts: Dict[str, int]  # Interaction type -> count
+    interaction_cards: Dict[str, List[str]]  # Interaction type -> [card names]
+    
+    # Set breakdown
+    set_counts: Dict[str, int]  # Set code -> count of cards
+    set_names: Dict[str, str]  # Set code -> full set name
     
     # Card details for manual review
     missing_cards: List[str]  # Cards that couldn't be found
@@ -109,6 +138,68 @@ class DeckAnalyzer:
     def __init__(self, scryfall_api):
         self.api = scryfall_api
     
+    def _categorize_interaction(self, card_name: str, type_line: str) -> List[str]:
+        """
+        Categorize cards by their interactive function.
+        
+        Returns:
+            List of interaction categories this card belongs to
+        """
+        categories = []
+        card_name_lower = card_name.lower()
+        type_line_lower = type_line.lower()
+        
+        # Removal spells
+        removal_keywords = [
+            'destroy', 'exile', 'return to hand', 'fatal push', 'path to exile',
+            'swords to plowshares', 'lightning bolt', 'doom blade', 'murder',
+            'toxic deluge', 'wrath', 'damnation', 'blasphemous edict',
+            'the meathook massacre', 'feed the swarm', 'tragic slip',
+            'flare of malice', 'withering torment'
+        ]
+        
+        if any(keyword in card_name_lower for keyword in removal_keywords):
+            categories.append('Removal')
+        
+        # Tutors
+        tutor_keywords = [
+            'tutor', 'search your library', 'diabolic intent', 'grim tutor',
+            'demonic tutor', 'vampiric tutor'
+        ]
+        
+        if any(keyword in card_name_lower for keyword in tutor_keywords):
+            categories.append('Tutors')
+        
+        # Card draw engines
+        card_draw_keywords = [
+            'draw', 'dark confidant', 'phyrexian arena', 'dark prophecy',
+            'black market connections', 'the one ring', 'skullclamp',
+            'deadly dispute', 'village rites', 'peer into the abyss'
+        ]
+        
+        if any(keyword in card_name_lower for keyword in card_draw_keywords):
+            categories.append('Card Draw')
+        
+        # Ramp/Mana acceleration
+        ramp_keywords = [
+            'sol ring', 'mana vault', 'arcane signet', 'charcoal diamond',
+            'mind stone', 'jet medallion', 'mox amber', 'dark ritual',
+            'cabal ritual', 'crypt ghast'
+        ]
+        
+        if any(keyword in card_name_lower for keyword in ramp_keywords):
+            categories.append('Ramp')
+        
+        # Counterspells/Protection
+        protection_keywords = [
+            'counter', "imp's mischief", 'deadly rollick'
+        ]
+        
+        if any(keyword in card_name_lower for keyword in protection_keywords):
+            categories.append('Protection')
+        
+        return categories
+    
     def _parse_primary_type(self, type_line: str) -> str:
         """
         Extract the primary card type from a type line.
@@ -155,18 +246,31 @@ class DeckAnalyzer:
         """
         print(f"Analyzing deck with {deck.unique_cards} unique cards...")
         
-        # Fetch card information
-        card_names = deck.get_card_names()
-        card_data = self.api.get_cards_batch(card_names)
+        # Fetch card information with set codes when available
+        card_requests = []
+        for card_name in deck.get_card_names():
+            set_code = deck.card_sets.get(card_name)
+            if set_code:
+                card_requests.append((card_name, set_code))
+            else:
+                card_requests.append(card_name)
+        
+        card_data = self.api.get_cards_batch(card_requests)
         
         # Initialize counters
         lands = 0
         color_counts = defaultdict(int)
         mana_curve = defaultdict(int)
         card_types = defaultdict(int)
+        rarity_counts = defaultdict(int)
+        interaction_counts = defaultdict(int)
+        interaction_cards = defaultdict(list)
+        set_counts = defaultdict(int)
         missing_cards = []
         total_mana_value = 0
         nonland_cards = 0
+        total_deck_value = 0.0
+        card_prices = []  # For tracking most expensive cards
         
         # Process each card
         for card_name, quantity in deck.cards.items():
@@ -193,9 +297,53 @@ class DeckAnalyzer:
             # Card type tracking (count unique cards, not copies)
             primary_type = self._parse_primary_type(card_info.type_line)
             card_types[primary_type] += 1
+            
+            # Rarity tracking (count unique cards, not copies)
+            rarity_counts[card_info.rarity] += 1
+            
+            # Price analysis
+            if card_info.price_usd is not None:
+                card_total_price = card_info.price_usd * quantity
+                total_deck_value += card_total_price
+                card_prices.append((card_name, card_info.price_usd))
+            
+            # Interaction categorization
+            interaction_categories = self._categorize_interaction(card_name, card_info.type_line)
+            for category in interaction_categories:
+                interaction_counts[category] += 1
+                interaction_cards[category].append(card_name)
+            
+            # Set tracking (count unique cards, not copies)
+            set_code = deck.card_sets.get(card_name, 'Unknown')
+            set_counts[set_code] += 1
         
         # Calculate average mana value (nonlands only)
         avg_mana_value = total_mana_value / nonland_cards if nonland_cards > 0 else 0
+        
+        # Find most expensive cards (top 5)
+        most_expensive = sorted(card_prices, key=lambda x: x[1], reverse=True)[:5]
+        
+        # Basic set name mapping (can be expanded with API calls if needed)
+        set_names = {
+            'FIN': 'Final Fantasy',
+            'MH3': 'Modern Horizons 3',
+            'CLB': 'Commander Legends: Battle for Baldur\'s Gate',
+            'MB2': 'Mystery Booster 2',
+            'CMM': 'Commander Masters',
+            'ELD': 'Throne of Eldraine',
+            'IKO': 'Ikoria: Lair of Behemoths',
+            'SLD': 'Secret Lair Drop',
+            'FDN': 'Foundations',
+            'LTC': 'The Lord of the Rings: Tales of Middle-earth Commander',
+            'LTR': 'The Lord of the Rings: Tales of Middle-earth',
+            'ZNR': 'Zendikar Rising',
+            'AFR': 'Adventures in the Forgotten Realms',
+            'WAR': 'War of the Spark',
+            'DMU': 'Dominaria United',
+            'MID': 'Midnight Hunt',
+            'THB': 'Theros Beyond Death',
+            'DSK': 'Duskmourn: House of Horror'
+        }
         
         # Create statistics object
         stats = DeckStats(
@@ -207,6 +355,13 @@ class DeckAnalyzer:
             mana_curve=dict(mana_curve),
             average_mana_value=avg_mana_value,
             card_types=dict(card_types),
+            total_deck_value=total_deck_value,
+            most_expensive_cards=most_expensive,
+            rarity_counts=dict(rarity_counts),
+            interaction_counts=dict(interaction_counts),
+            interaction_cards=dict(interaction_cards),
+            set_counts=dict(set_counts),
+            set_names=set_names,
             missing_cards=missing_cards
         )
         

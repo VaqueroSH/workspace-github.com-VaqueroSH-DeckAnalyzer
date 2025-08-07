@@ -1,0 +1,82 @@
+1 Sephiroth, Fabled SOLDIER // Sephiroth, One-Winged Angel (FIN) 115
+1 Accursed Marauder (MH3) 80
+1 Agent of the Iron Throne (CLB) 107
+1 Arcane Signet (MB2) 254 *F*
+1 Ashnod's Altar (CMM) 368
+1 Ayara, First of Locthwain (ELD) 75
+1 Bastion of Remembrance (IKO) 73
+1 Bitterblossom (SLD) 12
+1 Black Market Connections (LCC) 181
+1 Blasphemous Edict (FDN) 57
+1 Bojuka Bog (LTC) 388 *F*
+1 Bolas's Citadel (PLG21) 3 *F*
+1 Bontu's Monument (DRC) 124
+1 Braids, Arisen Nightmare (EOC) 82
+1 Cabal Coffers (MH2) 325
+1 Cabal Ritual (MB2) 177 *F*
+1 Carrion Feeder (SLD) 1114
+1 Charcoal Diamond (CMR) 303
+1 Crypt Ghast (RVR) 322 *F*
+1 Crypt of Agadeem (TDC) 354
+1 Dark Confidant (FIN) 334
+1 Dark Prophecy (M14) 93
+1 Dark Ritual (FCA) 8
+1 Dauthi Voidwalker (SCH) 23e
+1 Deadly Dispute (AFR) 94
+1 Deadly Rollick (SLD) 1754
+1 Demonic Tutor (STA) 90
+1 Diabolic Intent (LTC) 526
+1 Dictate of Erebos (PLST) JOU-65
+1 Fatal Push (FCA) 9 *F*
+1 Feed the Swarm (ZNR) 102
+1 Flare of Malice (MH3) 408 *F*
+1 Forsaken Miner (OTJ) 88
+1 Grave Pact (WOT) 73
+1 Gravecrawler (DRC) 43
+1 Grim Tutor (SLD) 365 *F*
+1 Imp's Mischief (OTP) 15
+1 Jet Medallion (MH3) 292
+1 Liliana, Dreadhorde General (WAR) 97
+1 Mana Vault (5ED) 388
+1 Marauding Blight-Priest (ZNR) 112
+1 Massacre Wurm (FDN) 714 *F*
+1 Midgar, City of Mako // Reactor Raid (FIN) 286
+1 Mind Stone (PLST) C18-210
+1 Mirkwood Bats (LTR) 421
+1 Mox Amber (BRR) 35
+1 Nether Traitor (TSR) 127
+1 Nine-Lives Familiar (FDN) 321
+1 Nykthos, Shrine to Nyx (THS) 223
+1 Ophiomancer (MH3) 276
+1 Opposition Agent (CMR) 141
+1 Orcish Bowmasters (LTR) 103
+1 Peer into the Abyss (PLST) M21-117
+1 Phyrexian Altar (2X2) 311 *F*
+1 Phyrexian Arena (APC) 47
+1 Phyrexian Tower (MH3) 303 *F*
+1 Pitiless Plunderer (SPG) 5
+1 Plaguecrafter (SLD) 1116
+1 Reanimate (FIC) 282 *F*
+1 Saw in Half (SLD) 1755
+1 Sheoldred, the Apocalypse (DMU) 369
+1 Skullclamp (C20) 251
+1 Sol Ring (SLD) 2063 *F*
+1 Starscape Cleric (BLB) 116
+1 Strip Mine (4BB) 363
+24 Swamp (J25) 89
+1 Tergrid, God of Fright // Tergrid's Lantern (KHM) 112
+1 The Meathook Massacre (MID) 348 *F*
+1 The One Ring (LTR) 748 *F*
+1 Toxic Deluge (CMM) 191
+1 Tragic Slip (DDM) 66
+1 Urborg, Tomb of Yawgmoth (LTC) 375
+1 Vampiric Tutor (VIS) 72
+1 Victimize (EMA) 113
+1 Village Rites (INR) 137
+1 Viscera Seer (CMR) 158
+1 Vito, Thorn of the Dusk Rose (M21) 127
+1 Warren Soultrader (MH3) 332
+1 Westvale Abbey // Ormendahl, Profane Prince (INR) 287
+1 Withering Torment (DSK) 124
+1 Woe Strider (THB) 123
+1 Yawgmoth, Thran Physician (DMR) 431

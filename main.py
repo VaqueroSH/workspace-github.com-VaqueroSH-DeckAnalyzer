@@ -43,18 +43,16 @@ def print_deck_stats(stats):
         print(f"   Distribution:")
         for mana_value in sorted(stats.mana_curve.keys()):
             count = stats.mana_curve[mana_value]
-            bar = "█" * min(count, 20)  # Visual bar (max 20 chars)
             if mana_value == 0:
-                print(f"      0 CMC: {count:2d} |{bar}")
+                print(f"      0 CMC: {count:2d}")
             elif mana_value >= 7:
                 # Group 7+ together
                 if mana_value == 7:
                     high_cmc_count = sum(stats.mana_curve.get(i, 0) for i in range(7, 20))
-                    bar = "█" * min(high_cmc_count, 20)
-                    print(f"      7+ CMC: {high_cmc_count:2d} |{bar}")
+                    print(f"      7+ CMC: {high_cmc_count:2d}")
                 # Skip individual 8, 9, etc. since we grouped them
             else:
-                print(f"      {mana_value} CMC: {count:2d} |{bar}")
+                print(f"      {mana_value} CMC: {count:2d}")
     else:
         print("   No nonland cards to analyze")
     
@@ -66,10 +64,66 @@ def print_deck_stats(stats):
         
         for card_type, count in sorted_types:
             percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
-            bar = "█" * min(count, 20)  # Visual bar (max 20 chars)
-            print(f"   {card_type}: {count:2d} cards ({percentage:.1f}%) |{bar}")
+            print(f"   {card_type}: {count:2d} cards ({percentage:.1f}%)")
     else:
         print("   No card type data available")
+    
+    # Price analysis
+    print(f"\n💰 PRICE ANALYSIS")
+    if stats.total_deck_value > 0:
+        print(f"   Total deck value: ${stats.total_deck_value:.2f}")
+        if stats.most_expensive_cards:
+            print(f"   Most expensive cards:")
+            for card_name, price in stats.most_expensive_cards:
+                print(f"      • {card_name}: ${price:.2f}")
+    else:
+        print("   Price information not available")
+    
+    # Rarity breakdown
+    print(f"\n⭐ RARITY BREAKDOWN")
+    if stats.rarity_counts:
+        rarity_order = ['mythic', 'rare', 'uncommon', 'common', 'special', 'bonus']
+        rarity_names = {
+            'mythic': 'Mythic Rare',
+            'rare': 'Rare', 
+            'uncommon': 'Uncommon',
+            'common': 'Common',
+            'special': 'Special',
+            'bonus': 'Bonus'
+        }
+        
+        for rarity in rarity_order:
+            if rarity in stats.rarity_counts:
+                count = stats.rarity_counts[rarity]
+                percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+                rarity_display = rarity_names.get(rarity, rarity.title())
+                print(f"   {rarity_display}: {count} cards ({percentage:.1f}%)")
+        
+        # Handle any unknown rarities
+        for rarity, count in stats.rarity_counts.items():
+            if rarity not in rarity_order:
+                percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+                print(f"   {rarity.title()}: {count} cards ({percentage:.1f}%)")
+    else:
+        print("   Rarity information not available")
+    
+    # Interaction suite
+    print(f"\n🎯 INTERACTION SUITE")
+    if stats.interaction_counts:
+        for interaction_type in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
+            if interaction_type in stats.interaction_counts:
+                count = stats.interaction_counts[interaction_type]
+                print(f"   {interaction_type}: {count} cards")
+                
+                # Show up to 3 example cards
+                if interaction_type in stats.interaction_cards:
+                    examples = stats.interaction_cards[interaction_type][:3]
+                    example_str = ", ".join(examples)
+                    if len(stats.interaction_cards[interaction_type]) > 3:
+                        example_str += ", ..."
+                    print(f"      ({example_str})")
+    else:
+        print("   No interaction cards identified")
     
     # Missing cards warning
     if stats.missing_cards:

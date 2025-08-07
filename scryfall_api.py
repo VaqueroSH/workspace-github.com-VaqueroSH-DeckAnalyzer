@@ -16,6 +16,8 @@ class CardInfo:
     mana_value: int
     type_line: str
     is_land: bool
+    rarity: str
+    price_usd: Optional[float] = None
     
     @property
     def color_identity(self) -> Set[str]:
@@ -34,20 +36,32 @@ class ScryfallAPI:
         }
         self.cache: Dict[str, CardInfo] = {}
         
-    def get_card(self, card_name: str) -> Optional[CardInfo]:
+    def get_card(self, card_name: str, set_code: str = None) -> Optional[CardInfo]:
         """
         Fetch card information from Scryfall API.
         
         Args:
             card_name: The exact name of the card to fetch
+            set_code: Optional set code for more accurate pricing
             
         Returns:
             CardInfo object if found, None otherwise
         """
-        # Check cache first
-        if card_name in self.cache:
-            return self.cache[card_name]
+        # Create cache key that includes set code if available
+        cache_key = f"{card_name}|{set_code}" if set_code else card_name
         
+        # Check cache first
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        # Try to get specific set version first if set code is provided
+        if set_code:
+            card_info = self._get_card_from_set(card_name, set_code)
+            if card_info:
+                self.cache[cache_key] = card_info
+                return card_info
+        
+        # Fallback to general card lookup
         url = f"{self.base_url}/cards/named"
         params = {'exact': card_name}
         
@@ -59,7 +73,7 @@ class ScryfallAPI:
                 card_info = self._parse_card_data(data)
                 
                 # Cache the result
-                self.cache[card_name] = card_info
+                self.cache[cache_key] = card_info
                 return card_info
                 
             elif response.status_code == 404:
@@ -76,6 +90,37 @@ class ScryfallAPI:
             print(f"Unexpected error fetching {card_name}: {e}")
             return None
     
+    def _get_card_from_set(self, card_name: str, set_code: str) -> Optional[CardInfo]:
+        """
+        Try to fetch a card from a specific set for more accurate pricing.
+        
+        Args:
+            card_name: The exact name of the card to fetch
+            set_code: The set code to search in
+            
+        Returns:
+            CardInfo object if found, None otherwise
+        """
+        url = f"{self.base_url}/cards/named"
+        params = {
+            'exact': card_name,
+            'set': set_code.lower()
+        }
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return self._parse_card_data(data)
+            else:
+                # If specific set lookup fails, we'll fall back to general lookup
+                return None
+                
+        except Exception:
+            # If there's any error with set-specific lookup, fall back to general
+            return None
+    
     def _parse_card_data(self, data: Dict) -> CardInfo:
         """Parse card data from Scryfall API response."""
         name = data['name']
@@ -83,32 +128,49 @@ class ScryfallAPI:
         mana_value = int(data.get('cmc', 0))
         type_line = data.get('type_line', '')
         is_land = 'Land' in type_line
+        rarity = data.get('rarity', 'unknown')
+        
+        # Parse price (USD)
+        price_usd = None
+        if 'prices' in data and data['prices'].get('usd'):
+            try:
+                price_usd = float(data['prices']['usd'])
+            except (ValueError, TypeError):
+                price_usd = None
         
         return CardInfo(
             name=name,
             colors=colors,
             mana_value=mana_value,
             type_line=type_line,
-            is_land=is_land
+            is_land=is_land,
+            rarity=rarity,
+            price_usd=price_usd
         )
     
-    def get_cards_batch(self, card_names: list, delay: float = 0.1) -> Dict[str, Optional[CardInfo]]:
+    def get_cards_batch(self, card_requests: list, delay: float = 0.1) -> Dict[str, Optional[CardInfo]]:
         """
         Fetch multiple cards with rate limiting.
         
         Args:
-            card_names: List of card names to fetch
+            card_requests: List of (card_name, set_code) tuples or card names
             delay: Delay between requests in seconds (default: 0.1 for 10 req/sec)
             
         Returns:
             Dictionary mapping card names to CardInfo objects (or None if not found)
         """
         results = {}
-        total = len(card_names)
+        total = len(card_requests)
         
-        for i, card_name in enumerate(card_names, 1):
-            print(f"Fetching {i}/{total}: {card_name}")
-            results[card_name] = self.get_card(card_name)
+        for i, request in enumerate(card_requests, 1):
+            if isinstance(request, tuple):
+                card_name, set_code = request
+                print(f"Fetching {i}/{total}: {card_name} ({set_code})")
+                results[card_name] = self.get_card(card_name, set_code)
+            else:
+                card_name = request
+                print(f"Fetching {i}/{total}: {card_name}")
+                results[card_name] = self.get_card(card_name)
             
             # Rate limiting - don't delay after the last request
             if i < total:

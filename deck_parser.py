@@ -14,9 +14,13 @@ class DeckParser:
     def __init__(self):
         # Regex patterns for different decklist formats
         self.patterns = [
-            # "1 Card Name" or "1x Card Name"
+            # "1 Card Name (SET) 123 *F*" - full format with set and collector number
+            re.compile(r'^(\d+)x?\s+(.+?)\s+\(([A-Z0-9]+)\)\s+\d+(?:\s+\*[A-Z]*\*)?$', re.IGNORECASE),
+            # "1 Card Name (SET)" - format with set but no collector number  
+            re.compile(r'^(\d+)x?\s+(.+?)\s+\(([A-Z0-9]+)\)$', re.IGNORECASE),
+            # "1 Card Name" or "1x Card Name" - legacy format
             re.compile(r'^(\d+)x?\s+(.+)$', re.IGNORECASE),
-            # "Card Name" (assumes quantity 1)
+            # "Card Name" (assumes quantity 1) - legacy format
             re.compile(r'^([^0-9]+)$'),
         ]
         
@@ -48,6 +52,7 @@ class DeckParser:
             raise FileNotFoundError(f"Decklist file not found: {file_path}")
         
         cards = {}
+        card_sets = {}
         commander = None
         deck_name = path.stem  # Use filename as deck name
         
@@ -72,7 +77,11 @@ class DeckParser:
                 print(f"Warning: Could not parse line {line_num}: '{line}'")
                 continue
             
-            quantity, card_name = parsed
+            if len(parsed) == 3:
+                quantity, card_name, set_code = parsed
+                card_sets[card_name] = set_code
+            else:
+                quantity, card_name = parsed
             
             # Handle potential commander identification
             # (This is heuristic-based, could be improved with better format detection)
@@ -92,7 +101,7 @@ class DeckParser:
         # Try to identify commander (simple heuristic: legendary creature with quantity 1)
         # For now, we'll leave this for future enhancement
         
-        return Deck(cards=cards, name=deck_name, commander=commander)
+        return Deck(cards=cards, card_sets=card_sets, name=deck_name, commander=commander)
     
     def _should_ignore_line(self, line: str) -> bool:
         """Check if a line should be ignored during parsing."""
@@ -106,19 +115,37 @@ class DeckParser:
         Parse a single line of a decklist.
         
         Returns:
-            Tuple of (quantity, card_name) or None if parsing failed
+            Tuple of (quantity, card_name, set_code) for new format
+            or (quantity, card_name) for legacy format
+            or None if parsing failed
         """
         line = line.strip()
         
-        # Try "1 Card Name" format first
+        # Try new format with set and collector number first
         match = self.patterns[0].match(line)
+        if match:
+            quantity = int(match.group(1))
+            card_name = match.group(2).strip()
+            set_code = match.group(3).upper()
+            return quantity, card_name, set_code
+        
+        # Try new format with just set code
+        match = self.patterns[1].match(line)
+        if match:
+            quantity = int(match.group(1))
+            card_name = match.group(2).strip()
+            set_code = match.group(3).upper()
+            return quantity, card_name, set_code
+        
+        # Try legacy "1 Card Name" format
+        match = self.patterns[2].match(line)
         if match:
             quantity = int(match.group(1))
             card_name = match.group(2).strip()
             return quantity, card_name
         
-        # Try "Card Name" format (quantity = 1)
-        match = self.patterns[1].match(line)
+        # Try legacy "Card Name" format (quantity = 1)
+        match = self.patterns[3].match(line)
         if match:
             card_name = match.group(1).strip()
             # Skip very short names (likely parsing errors)
