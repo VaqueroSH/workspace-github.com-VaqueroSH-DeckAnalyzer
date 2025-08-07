@@ -244,7 +244,7 @@ class DeckAnalyzer:
         Returns:
             DeckStats object with all calculated statistics
         """
-        print(f"Analyzing deck with {deck.unique_cards} unique cards...")
+        # Analysis progress handled by Streamlit interface
         
         # Fetch card information with set codes when available
         card_requests = []

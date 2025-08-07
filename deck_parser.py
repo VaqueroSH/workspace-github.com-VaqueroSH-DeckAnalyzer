@@ -74,7 +74,7 @@ class DeckParser:
             # Try to parse the line
             parsed = self._parse_line(line)
             if parsed is None:
-                print(f"Warning: Could not parse line {line_num}: '{line}'")
+                # Parsing warnings handled by Streamlit interface
                 continue
             
             if len(parsed) == 3:
