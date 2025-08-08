@@ -4,6 +4,7 @@ Scryfall API client for fetching Magic: The Gathering card information.
 
 import requests
 import time
+import random
 from typing import Optional, Dict, Set
 from dataclasses import dataclass
 
@@ -35,6 +36,69 @@ class ScryfallAPI:
             'Accept': 'application/json;q=0.9,*/*;q=0.8'
         }
         self.cache: Dict[str, CardInfo] = {}
+        self.last_request_time = 0
+        self.min_delay = 0.1  # Minimum 100ms between requests (10 req/sec max)
+    
+    def _make_request_with_retry(self, url: str, params: Dict, max_retries: int = 3) -> Optional[requests.Response]:
+        """
+        Make a request with exponential backoff retry for rate limiting.
+        
+        Args:
+            url: The URL to request
+            params: Query parameters
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            Response object if successful, None if all retries failed
+        """
+        for attempt in range(max_retries + 1):
+            # Rate limiting - ensure we don't exceed our request rate
+            current_time = time.time()
+            time_since_last = current_time - self.last_request_time
+            if time_since_last < self.min_delay:
+                time.sleep(self.min_delay - time_since_last)
+            
+            try:
+                self.last_request_time = time.time()
+                response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    return response
+                elif response.status_code == 404:
+                    # Card not found - don't retry
+                    return response
+                elif response.status_code == 429:
+                    # Rate limited - implement exponential backoff
+                    if attempt < max_retries:
+                        # Extract retry-after header if available
+                        retry_after = response.headers.get('Retry-After')
+                        if retry_after:
+                            try:
+                                wait_time = float(retry_after)
+                            except ValueError:
+                                wait_time = 2 ** attempt  # Exponential backoff
+                        else:
+                            wait_time = 2 ** attempt + random.uniform(0, 1)  # Jitter
+                        
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        # Max retries exceeded
+                        return None
+                else:
+                    # Other HTTP error - don't retry
+                    return None
+                    
+            except requests.RequestException:
+                if attempt < max_retries:
+                    # Network error - retry with exponential backoff
+                    wait_time = 2 ** attempt + random.uniform(0, 1)
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    return None
+        
+        return None
         
     def get_card(self, card_name: str, set_code: str = None) -> Optional[CardInfo]:
         """
@@ -66,9 +130,9 @@ class ScryfallAPI:
         params = {'exact': card_name}
         
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            response = self._make_request_with_retry(url, params)
             
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 data = response.json()
                 card_info = self._parse_card_data(data)
                 
@@ -76,16 +140,13 @@ class ScryfallAPI:
                 self.cache[cache_key] = card_info
                 return card_info
                 
-            elif response.status_code == 404:
+            elif response and response.status_code == 404:
                 # Card not found - silently return None for cleaner web interface
                 return None
             else:
-                # API error - silently return None for cleaner web interface
+                # API error or no response - silently return None for cleaner web interface
                 return None
                 
-        except requests.RequestException as e:
-            # Network error - silently return None for cleaner web interface
-            return None
         except Exception as e:
             # Unexpected error - silently return None for cleaner web interface
             return None
@@ -108,9 +169,9 @@ class ScryfallAPI:
         }
         
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            response = self._make_request_with_retry(url, params)
             
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 data = response.json()
                 return self._parse_card_data(data)
             else:
@@ -148,21 +209,19 @@ class ScryfallAPI:
             price_usd=price_usd
         )
     
-    def get_cards_batch(self, card_requests: list, delay: float = 0.2) -> Dict[str, Optional[CardInfo]]:
+    def get_cards_batch(self, card_requests: list) -> Dict[str, Optional[CardInfo]]:
         """
-        Fetch multiple cards with rate limiting.
+        Fetch multiple cards with built-in rate limiting and retry logic.
         
         Args:
             card_requests: List of (card_name, set_code) tuples or card names
-            delay: Delay between requests in seconds (default: 0.2 for 5 req/sec)
             
         Returns:
             Dictionary mapping card names to CardInfo objects (or None if not found)
         """
         results = {}
-        total = len(card_requests)
         
-        for i, request in enumerate(card_requests, 1):
+        for request in card_requests:
             if isinstance(request, tuple):
                 card_name, set_code = request
                 # Progress reporting handled by Streamlit interface
@@ -171,9 +230,5 @@ class ScryfallAPI:
                 card_name = request
                 # Progress reporting handled by Streamlit interface
                 results[card_name] = self.get_card(card_name)
-            
-            # Rate limiting - don't delay after the last request
-            if i < total:
-                time.sleep(delay)
         
         return results

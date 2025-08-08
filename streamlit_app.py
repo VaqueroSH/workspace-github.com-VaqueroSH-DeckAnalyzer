@@ -143,39 +143,45 @@ if analyze_button and decklist_content.strip():
                 if stats.color_counts:
                     # Create color chart with MTG colors
                     color_mapping = {
-                        'W': ('#FFFBD5', 'White'),
-                        'U': ('#0E68AB', 'Blue'), 
-                        'B': ('#150B00', 'Black'),
-                        'R': ('#D3202A', 'Red'),
-                        'G': ('#00733E', 'Green'),
-                        'C': ('#CCCCCC', 'Colorless')
+                        'W': '#FFFBD5',  # White/cream
+                        'U': '#0E68AB',  # Blue
+                        'B': '#150B00',  # Black/dark brown
+                        'R': '#D3202A',  # Red
+                        'G': '#00733E',  # Green
+                        'C': '#CCCCCC'   # Colorless/gray
                     }
                     
                     color_df = []
-                    colors_for_chart = []
+                    # Create a color map for the specific colors in this deck
+                    deck_color_map = {}
+                    
                     for color_code, count in sorted(stats.color_counts.items()):
                         color_name = stats.color_names.get(color_code, color_code)
                         percentage = (count / stats.unique_cards * 100)
+                        color_label = f"{color_name} ({color_code})"
+                        
                         color_df.append({
-                            "Color": f"{color_name} ({color_code})", 
+                            "Color": color_label, 
                             "Cards": count, 
                             "Percentage": percentage
                         })
-                        colors_for_chart.append(color_mapping.get(color_code, ('#CCCCCC', color_code))[0])
+                        
+                        # Map the color label to its hex color
+                        deck_color_map[color_label] = color_mapping.get(color_code, '#CCCCCC')
                     
                     df = pd.DataFrame(color_df)
                     
-                    # Create pie chart for color distribution
+                    # Create pie chart for color distribution with explicit color mapping
                     fig = px.pie(df, values='Cards', names='Color', 
                                 title="Color Distribution",
-                                color_discrete_sequence=colors_for_chart)
+                                color_discrete_map=deck_color_map)
                     fig.update_layout(showlegend=True, height=400)
                     st.plotly_chart(fig, use_container_width=True)
                     
                     # Show data table too
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
-                    st.info("Colorless deck")
+                    st.info("No colored cards found - this appears to be a colorless deck")
             
             with st.expander("📈 Mana Curve", expanded=True):
                 if stats.mana_curve:
