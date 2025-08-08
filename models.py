@@ -180,14 +180,48 @@ class DeckAnalyzer:
         if any(keyword in card_name_lower for keyword in card_draw_keywords):
             categories.append('Card Draw')
         
-        # Ramp/Mana acceleration
-        ramp_keywords = [
-            'sol ring', 'mana vault', 'arcane signet', 'charcoal diamond',
-            'mind stone', 'jet medallion', 'mox amber', 'dark ritual',
-            'cabal ritual', 'crypt ghast'
+        # Ramp/Mana acceleration - comprehensive detection
+        # Common mana rock patterns
+        mana_rock_patterns = [
+            'signet', 'talisman', 'diamond', 'stone', 'mox', 'lotus',
+            'dynamo', 'sphere', 'lantern', 'crypt', 'vault', 'medallion'
         ]
         
-        if any(keyword in card_name_lower for keyword in ramp_keywords):
+        # Specific mana rocks and ramp spells
+        ramp_keywords = [
+            # Artifacts
+            'sol ring', 'mana vault', 'arcane signet', 'charcoal diamond',
+            'mind stone', 'jet medallion', 'mox amber', 'chrome mox', 'mox diamond',
+            'commander\'s sphere', 'fellwar stone', 'chromatic lantern',
+            'thran dynamo', 'gilded lotus', 'basalt monolith', 'grim monolith',
+            'mana crypt', 'lotus petal', 'darksteel ingot', 'coalition relic',
+            'worn powerstone', 'prismatic lens', 'fire diamond', 'marble diamond',
+            'sky diamond', 'moss diamond', 'coldsteel heart',
+            # Signets
+            'azorius signet', 'boros signet', 'dimir signet', 'golgari signet',
+            'gruul signet', 'izzet signet', 'orzhov signet', 'rakdos signet',
+            'selesnya signet', 'simic signet',
+            # Talismans
+            'talisman of progress', 'talisman of conviction', 'talisman of dominance',
+            'talisman of resilience', 'talisman of impulse', 'talisman of creativity',
+            'talisman of hierarchy', 'talisman of indulgence', 'talisman of unity',
+            'talisman of curiosity',
+            # Rituals and creature ramp
+            'dark ritual', 'cabal ritual', 'seething song', 'pyretic ritual',
+            'desperate ritual', 'rite of flame', 'lotus ritual',
+            # Creature ramp
+            'crypt ghast', 'priest of titania', 'elvish mystic', 'llanowar elves',
+            'birds of paradise', 'noble hierarch', 'deathrite shaman'
+        ]
+        
+        # Check specific names first
+        is_ramp = any(keyword in card_name_lower for keyword in ramp_keywords)
+        
+        # Check for common mana rock patterns in artifacts
+        if not is_ramp and 'artifact' in type_line_lower:
+            is_ramp = any(pattern in card_name_lower for pattern in mana_rock_patterns)
+        
+        if is_ramp:
             categories.append('Ramp')
         
         # Counterspells/Protection
