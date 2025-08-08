@@ -147,7 +147,8 @@ if analyze_button and decklist_content.strip():
                         'U': ('#0E68AB', 'Blue'), 
                         'B': ('#150B00', 'Black'),
                         'R': ('#D3202A', 'Red'),
-                        'G': ('#00733E', 'Green')
+                        'G': ('#00733E', 'Green'),
+                        'C': ('#CCCCCC', 'Colorless')
                     }
                     
                     color_df = []

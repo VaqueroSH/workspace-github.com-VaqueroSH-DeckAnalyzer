@@ -58,7 +58,8 @@ class DeckStats:
         'U': 'Blue', 
         'B': 'Black',
         'R': 'Red',
-        'G': 'Green'
+        'G': 'Green',
+        'C': 'Colorless'
     }
     
     # Mana curve
@@ -392,8 +393,12 @@ class DeckAnalyzer:
                 mana_curve[card_info.mana_value] += quantity
             
             # Color identity (count unique cards, not copies)
-            for color in card_info.colors:
-                color_counts[color] += 1
+            if card_info.colors:
+                for color in card_info.colors:
+                    color_counts[color] += 1
+            else:
+                # Card has no colors, so it's colorless
+                color_counts['C'] += 1
             
             # Card type tracking (count unique cards, not copies)
             primary_type = self._parse_primary_type(card_info.type_line)
