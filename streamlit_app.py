@@ -7,6 +7,9 @@ import streamlit as st
 from pathlib import Path
 import tempfile
 import os
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
 
 from scryfall_api import ScryfallAPI
 from deck_parser import parse_decklist
@@ -76,24 +79,38 @@ if analyze_button and decklist_content.strip():
             temp_file.write(decklist_content)
             temp_file_path = temp_file.name
         
-        # Progress indicators
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # Enhanced progress indicators with animations
+        progress_container = st.container()
+        with progress_container:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Add some visual flair with columns for status
+            status_cols = st.columns(4)
+            step_indicators = []
+            for i, (icon, text) in enumerate([
+                ("📄", "Parse"), ("🌐", "API"), ("🔍", "Analyze"), ("✅", "Complete")
+            ]):
+                with status_cols[i]:
+                    step_indicators.append(st.empty())
         
         try:
             # Parse the decklist
             status_text.text("📄 Parsing decklist...")
+            step_indicators[0].success("📄 Parse")
             progress_bar.progress(20)
             deck = parse_decklist(temp_file_path)
             
             # Initialize API and analyzer
             status_text.text("🌐 Connecting to Scryfall API...")
+            step_indicators[1].info("🌐 API")
             progress_bar.progress(40)
             api = ScryfallAPI()
             analyzer = DeckAnalyzer(api)
             
             # Analyze the deck
             status_text.text("🔍 Analyzing deck...")
+            step_indicators[2].warning("🔍 Analyze")
             progress_bar.progress(60)
             
             # Analyze the deck (no stdout output from analyzer)
@@ -101,6 +118,7 @@ if analyze_button and decklist_content.strip():
             
             progress_bar.progress(100)
             status_text.text("✅ Analysis complete!")
+            step_indicators[3].success("✅ Complete")
             
             # Display results
             st.success(f"🎉 Successfully analyzed {stats.unique_cards} unique cards!")
@@ -123,33 +141,93 @@ if analyze_button and decklist_content.strip():
             # Detailed statistics in expandable sections
             with st.expander("🎨 Color Distribution", expanded=True):
                 if stats.color_counts:
-                    color_data = []
+                    # Create color chart with MTG colors
+                    color_mapping = {
+                        'W': ('#FFFBD5', 'White'),
+                        'U': ('#0E68AB', 'Blue'), 
+                        'B': ('#150B00', 'Black'),
+                        'R': ('#D3202A', 'Red'),
+                        'G': ('#00733E', 'Green')
+                    }
+                    
+                    color_df = []
+                    colors_for_chart = []
                     for color_code, count in sorted(stats.color_counts.items()):
                         color_name = stats.color_names.get(color_code, color_code)
                         percentage = (count / stats.unique_cards * 100)
-                        color_data.append({"Color": f"{color_name} ({color_code})", "Cards": count, "Percentage": f"{percentage:.1f}%"})
-                    st.dataframe(color_data, use_container_width=True)
+                        color_df.append({
+                            "Color": f"{color_name} ({color_code})", 
+                            "Cards": count, 
+                            "Percentage": percentage
+                        })
+                        colors_for_chart.append(color_mapping.get(color_code, ('#CCCCCC', color_code))[0])
+                    
+                    df = pd.DataFrame(color_df)
+                    
+                    # Create pie chart for color distribution
+                    fig = px.pie(df, values='Cards', names='Color', 
+                                title="Color Distribution",
+                                color_discrete_sequence=colors_for_chart)
+                    fig.update_layout(showlegend=True, height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show data table too
+                    st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
                     st.info("Colorless deck")
             
-            with st.expander("📈 Mana Curve"):
+            with st.expander("📈 Mana Curve", expanded=True):
                 if stats.mana_curve:
-                    st.write(f"**Average Mana Value:** {stats.average_mana_value:.2f}")
+                    # Create two columns for average CMC and ideal curve info
+                    curve_col1, curve_col2 = st.columns(2)
                     
-                    # Create mana curve data
+                    with curve_col1:
+                        st.metric("⚡ Average CMC", f"{stats.average_mana_value:.2f}")
+                    
+                    with curve_col2:
+                        nonland_count = sum(stats.mana_curve.values())
+                        st.metric("🃏 Nonland Cards", nonland_count)
+                    
+                    # Create enhanced mana curve data
                     curve_data = []
-                    for mana_value in sorted(stats.mana_curve.keys()):
-                        count = stats.mana_curve[mana_value]
-                        if mana_value == 0:
-                            curve_data.append({"CMC": "0", "Cards": count})
-                        elif mana_value >= 7:
-                            if mana_value == 7:
-                                high_cmc_count = sum(stats.mana_curve.get(i, 0) for i in range(7, 20))
-                                curve_data.append({"CMC": "7+", "Cards": high_cmc_count})
-                        else:
-                            curve_data.append({"CMC": str(mana_value), "Cards": count})
+                    all_cmc_values = list(range(8))  # 0-7+
                     
-                    st.bar_chart(data=curve_data, x="CMC", y="Cards")
+                    for cmc in all_cmc_values:
+                        if cmc == 7:
+                            # Handle 7+ CMC
+                            high_cmc_count = sum(stats.mana_curve.get(i, 0) for i in range(7, 20))
+                            curve_data.append({"CMC": "7+", "Cards": high_cmc_count, "CMC_Sort": 7})
+                        else:
+                            count = stats.mana_curve.get(cmc, 0)
+                            curve_data.append({"CMC": str(cmc), "Cards": count, "CMC_Sort": cmc})
+                    
+                    df = pd.DataFrame(curve_data)
+                    
+                    # Create interactive bar chart
+                    fig = px.bar(df, x='CMC', y='Cards', 
+                                title="Mana Curve Distribution",
+                                color='Cards',
+                                color_continuous_scale='blues')
+                    
+                    # Customize the chart
+                    fig.update_layout(
+                        xaxis_title="Converted Mana Cost",
+                        yaxis_title="Number of Cards",
+                        showlegend=False,
+                        height=400
+                    )
+                    
+                    fig.update_traces(
+                        texttemplate='%{y}', 
+                        textposition='outside',
+                        hovertemplate='<b>%{x} CMC</b><br>Cards: %{y}<extra></extra>'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show ideal curve guidance
+                    st.info("💡 **Ideal Curve Tips**: Most decks want more low-cost cards (1-3 CMC) than high-cost cards for consistent gameplay.")
+                    
                 else:
                     st.info("No nonland cards to analyze")
             
@@ -207,14 +285,47 @@ if analyze_button and decklist_content.strip():
             
             with st.expander("🃏 Card Type Breakdown"):
                 if stats.card_types:
+                    # Create enhanced card type visualization
                     type_data = []
                     sorted_types = sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0]))
                     
                     for card_type, count in sorted_types:
                         percentage = (count / stats.unique_cards * 100)
-                        type_data.append({"Type": card_type, "Cards": count, "Percentage": f"{percentage:.1f}%"})
+                        type_data.append({
+                            "Type": card_type, 
+                            "Cards": count, 
+                            "Percentage": percentage
+                        })
                     
-                    st.dataframe(type_data, use_container_width=True)
+                    df = pd.DataFrame(type_data)
+                    
+                    # Create horizontal bar chart for card types
+                    fig = px.bar(df, x='Cards', y='Type', 
+                                title="Card Types Distribution",
+                                orientation='h',
+                                color='Cards',
+                                color_continuous_scale='viridis')
+                    
+                    fig.update_layout(
+                        xaxis_title="Number of Cards",
+                        yaxis_title="Card Type",
+                        height=max(300, len(sorted_types) * 50),
+                        showlegend=False
+                    )
+                    
+                    fig.update_traces(
+                        texttemplate='%{x}', 
+                        textposition='outside',
+                        hovertemplate='<b>%{y}</b><br>Cards: %{x}<extra></extra>'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show data table with percentages
+                    df_display = df.copy()
+                    df_display['Percentage'] = df_display['Percentage'].apply(lambda x: f"{x:.1f}%")
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    
                 else:
                     st.info("No card type data available")
             
@@ -233,9 +344,10 @@ if analyze_button and decklist_content.strip():
             # Clean up temporary file
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
-            # Clear progress indicators
-            progress_bar.empty()
-            status_text.empty()
+            # Clear progress indicators after a short delay
+            import time
+            time.sleep(1)
+            progress_container.empty()
             
     except Exception as e:
         st.error(f"❌ Error analyzing deck: {e}")
