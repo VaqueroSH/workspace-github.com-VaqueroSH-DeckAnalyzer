@@ -26,7 +26,7 @@ st.markdown("### Analyze your Magic: The Gathering decklists with detailed stati
 
 # Sidebar for options
 st.sidebar.header("⚙️ Options")
-show_verbose = st.sidebar.checkbox("Show detailed progress", value=False)
+show_verbose = st.sidebar.checkbox("Show detailed error information", value=False)
 
 # Main input area
 st.header("📝 Enter Your Decklist")
@@ -96,20 +96,8 @@ if analyze_button and decklist_content.strip():
             status_text.text("🔍 Analyzing deck...")
             progress_bar.progress(60)
             
-            # Capture the analysis output if verbose mode is on
-            if show_verbose:
-                with st.expander("🔧 Detailed Analysis Progress"):
-                    stats = analyzer.analyze(deck)
-            else:
-                # Suppress the print output
-                import io
-                import sys
-                old_stdout = sys.stdout
-                sys.stdout = io.StringIO()
-                try:
-                    stats = analyzer.analyze(deck)
-                finally:
-                    sys.stdout = old_stdout
+            # Analyze the deck (no stdout output from analyzer)
+            stats = analyzer.analyze(deck)
             
             progress_bar.progress(100)
             status_text.text("✅ Analysis complete!")

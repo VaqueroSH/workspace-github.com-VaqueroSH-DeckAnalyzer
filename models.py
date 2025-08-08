@@ -180,46 +180,113 @@ class DeckAnalyzer:
         if any(keyword in card_name_lower for keyword in card_draw_keywords):
             categories.append('Card Draw')
         
-        # Ramp/Mana acceleration - comprehensive detection
-        # Common mana rock patterns
-        mana_rock_patterns = [
-            'signet', 'talisman', 'diamond', 'stone', 'mox', 'lotus',
-            'dynamo', 'sphere', 'lantern', 'crypt', 'vault', 'medallion'
-        ]
+        # Comprehensive mana rock and ramp detection
         
-        # Specific mana rocks and ramp spells
-        ramp_keywords = [
-            # Artifacts
-            'sol ring', 'mana vault', 'arcane signet', 'charcoal diamond',
-            'mind stone', 'jet medallion', 'mox amber', 'chrome mox', 'mox diamond',
-            'commander\'s sphere', 'fellwar stone', 'chromatic lantern',
-            'thran dynamo', 'gilded lotus', 'basalt monolith', 'grim monolith',
-            'mana crypt', 'lotus petal', 'darksteel ingot', 'coalition relic',
-            'worn powerstone', 'prismatic lens', 'fire diamond', 'marble diamond',
-            'sky diamond', 'moss diamond', 'coldsteel heart',
-            # Signets
+        # Specific mana rocks (exact names) - most reliable method
+        mana_rocks = {
+            # Sol Ring family
+            'sol ring', 'sol talisman',
+            
+            # Signets (all 10 two-color combinations)
             'azorius signet', 'boros signet', 'dimir signet', 'golgari signet',
             'gruul signet', 'izzet signet', 'orzhov signet', 'rakdos signet',
             'selesnya signet', 'simic signet',
-            # Talismans
+            
+            # Talismans (all 10 two-color combinations)
             'talisman of progress', 'talisman of conviction', 'talisman of dominance',
             'talisman of resilience', 'talisman of impulse', 'talisman of creativity',
             'talisman of hierarchy', 'talisman of indulgence', 'talisman of unity',
             'talisman of curiosity',
-            # Rituals and creature ramp
+            
+            # Diamonds (all 5 colors)
+            'fire diamond', 'marble diamond', 'sky diamond', 'charcoal diamond', 'moss diamond',
+            
+            # Moxen
+            'mox amber', 'mox diamond', 'mox opal', 'mox ruby', 'mox sapphire',
+            'mox jet', 'mox emerald', 'mox pearl', 'chrome mox', 'mox tantalite',
+            
+            # Common 2-mana rocks
+            'mind stone', 'fellwar stone', 'prismatic lens', 'thought vessel',
+            'everflowing chalice', 'guardian idol', 'coldsteel heart',
+            'star compass', 'liquimetal torque', 'fractured powerstone',
+            'rampant growth', 'worn powerstone', 'fire diamond',
+            
+            # 3-mana rocks
+            'coalition relic', 'chromatic lantern', 'commander\'s sphere',
+            'darksteel ingot', 'cultivator\'s caravan', 'heraldic banner',
+            'obelisk of urd', 'pristine talisman', 'unstable obelisk',
+            'wayfarers\' bauble', 'manalith', 'spinning wheel',
+            
+            # Expensive rocks
+            'thran dynamo', 'gilded lotus', 'hedron archive', 'dreamstone hedron',
+            'ur-golem\'s eye', 'sisay\'s ring', 'khalni gem', 'nyx lotus',
+            'empowered autogenerator', 'tome of the guildpact',
+            
+            # Fast mana
+            'mana crypt', 'mana vault', 'lotus petal', 'lion\'s eye diamond',
+            'jeweled lotus', 'black lotus', 'lotus bloom', 'simian spirit guide',
+            'elvish spirit guide', 'basalt monolith', 'grim monolith',
+            
+            # Medallions
+            'sapphire medallion', 'ruby medallion', 'emerald medallion',
+            'jet medallion', 'pearl medallion',
+            
+            # Modern/newer rocks
+            'arcane signet', 'talisman of creativity', 'orzhov locket',
+            'boros locket', 'izzet locket', 'golgari locket', 'selesnya locket',
+            'dimir locket', 'gruul locket', 'azorius locket', 'rakdos locket',
+            'simic locket', 'honored heirloom', 'power depot', 'liquimetal torque',
+            'the mightstone and weakstone', 'the temporal anchor'
+        }
+        
+        # Ritual spells
+        ritual_spells = {
             'dark ritual', 'cabal ritual', 'seething song', 'pyretic ritual',
-            'desperate ritual', 'rite of flame', 'lotus ritual',
-            # Creature ramp
-            'crypt ghast', 'priest of titania', 'elvish mystic', 'llanowar elves',
-            'birds of paradise', 'noble hierarch', 'deathrite shaman'
-        ]
+            'desperate ritual', 'rite of flame', 'lotus ritual', 'rain of filth',
+            'culling the weak', 'sacrifice', 'burnt offering', 'songs of the damned',
+            'bubbling muck', 'cabal stronghold', 'bog witch'
+        }
         
-        # Check specific names first
-        is_ramp = any(keyword in card_name_lower for keyword in ramp_keywords)
+        # Mana dorks (creatures that produce mana)
+        mana_dorks = {
+            'llanowar elves', 'elvish mystic', 'fyndhorn elves', 'elves of deep shadow',
+            'birds of paradise', 'noble hierarch', 'deathrite shaman',
+            'priest of titania', 'elvish archdruid', 'wirewood channeler',
+            'crypt ghast', 'magus of the coffers', 'priest of gix',
+            'silver myr', 'gold myr', 'iron myr', 'copper myr', 'leaden myr',
+            'palladium myr', 'alloy myr', 'plague myr', 'sol ring bearer'
+        }
         
-        # Check for common mana rock patterns in artifacts
-        if not is_ramp and 'artifact' in type_line_lower:
-            is_ramp = any(pattern in card_name_lower for pattern in mana_rock_patterns)
+        # Land ramp spells
+        land_ramp = {
+            'rampant growth', 'cultivate', 'kodama\'s reach', 'explosive vegetation',
+            'skyshroud claim', 'nature\'s lore', 'three visits', 'farseek',
+            'into the north', 'edge of autumn', 'solemn simulacrum'
+        }
+        
+        # Check for exact matches first (most reliable)
+        is_mana_rock = card_name_lower in mana_rocks
+        is_ritual = card_name_lower in ritual_spells  
+        is_dork = card_name_lower in mana_dorks
+        is_land_ramp = card_name_lower in land_ramp
+        
+        # For artifacts, check if it's likely a mana rock by name patterns
+        is_artifact_ramp = False
+        if 'artifact' in type_line_lower and not any([is_mana_rock, is_ritual, is_dork]):
+            # Safe patterns that are very likely mana rocks
+            safe_rock_patterns = ['signet', 'talisman', 'medallion', 'mox']
+            # More specific patterns to avoid false positives
+            specific_patterns = [
+                'mana', 'sol ', 'lotus', 'dynamo', 'monolith', 'sphere', 
+                'lantern', 'crypt', 'vault', 'obelisk', 'ingot'
+            ]
+            
+            is_artifact_ramp = (
+                any(pattern in card_name_lower for pattern in safe_rock_patterns) or
+                any(pattern in card_name_lower for pattern in specific_patterns)
+            )
+        
+        is_ramp = is_mana_rock or is_ritual or is_dork or is_land_ramp or is_artifact_ramp
         
         if is_ramp:
             categories.append('Ramp')

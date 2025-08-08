@@ -137,7 +137,7 @@ deck_analyzer/
 
 ## Rate Limiting ⚡
 
-The program automatically rate-limits API requests to stay within Scryfall's limits (10 requests/second). For most decks, analysis completes in 10-15 seconds.
+The program automatically rate-limits API requests to stay within Scryfall's limits (5 requests/second). For most decks, analysis completes in 15-20 seconds.
 
 ## Requirements 🐍
 

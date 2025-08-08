@@ -148,13 +148,13 @@ class ScryfallAPI:
             price_usd=price_usd
         )
     
-    def get_cards_batch(self, card_requests: list, delay: float = 0.1) -> Dict[str, Optional[CardInfo]]:
+    def get_cards_batch(self, card_requests: list, delay: float = 0.2) -> Dict[str, Optional[CardInfo]]:
         """
         Fetch multiple cards with rate limiting.
         
         Args:
             card_requests: List of (card_name, set_code) tuples or card names
-            delay: Delay between requests in seconds (default: 0.1 for 10 req/sec)
+            delay: Delay between requests in seconds (default: 0.2 for 5 req/sec)
             
         Returns:
             Dictionary mapping card names to CardInfo objects (or None if not found)
