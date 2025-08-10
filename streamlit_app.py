@@ -152,34 +152,39 @@ if analyze_button and decklist_content.strip():
                     }
                     
                     color_df = []
-                    # Create a color map for the specific colors in this deck
-                    deck_color_map = {}
-                    
                     for color_code, count in sorted(stats.color_counts.items()):
                         color_name = stats.color_names.get(color_code, color_code)
                         percentage = (count / stats.unique_cards * 100)
                         color_label = f"{color_name} ({color_code})"
                         
                         color_df.append({
-                            "Color": color_label, 
+                            "Code": color_code,           # single-letter code used for color mapping
+                            "Label": color_label,         # human-friendly label shown in the legend and hover
                             "Cards": count, 
                             "Percentage": percentage
                         })
                         
-                        # Map the color label to its hex color
-                        deck_color_map[color_label] = color_mapping.get(color_code, '#CCCCCC')
-                    
+                    # Ensure `df` is properly constructed
                     df = pd.DataFrame(color_df)
-                    
+
                     # Create pie chart for color distribution with explicit color mapping
-                    fig = px.pie(df, values='Cards', names='Color', 
-                                title="Color Distribution",
-                                color_discrete_map=deck_color_map)
+                    fig = px.pie(
+                        df,
+                        values='Cards',
+                        names='Label',          # what users see
+                        color='Code',           # what Plotly uses to map colors
+                        title="Color Distribution",
+                        color_discrete_map=color_mapping
+                    )
                     fig.update_layout(showlegend=True, height=400)
                     st.plotly_chart(fig, use_container_width=True)
                     
                     # Show data table too
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        df[["Label", "Cards", "Percentage"]].assign(Percentage=lambda d: (d["Percentage"]).map(lambda x: f"{x:.1f}%")),
+                        use_container_width=True,
+                        hide_index=True
+                    )
                 else:
                     st.info("No colored cards found - this appears to be a colorless deck")
             

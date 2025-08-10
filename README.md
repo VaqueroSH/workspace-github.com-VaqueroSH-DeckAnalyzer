@@ -1,15 +1,17 @@
 # MTG Deck Analyzer 🃏
 
-A Python program that analyzes Magic: The Gathering decklists and provides comprehensive statistics using the Scryfall API.
+A Python program and Streamlit web app that analyzes Magic: The Gathering decklists and provides comprehensive statistics using the Scryfall API.
 
 ## Features ✨
 
 - **Total card counts** - Total cards and unique cards in the deck
 - **Land analysis** - Counts and percentages of lands vs nonlands
-- **Color distribution** - Shows which colors appear in your deck and how often
+- **Color distribution** - Interactive pie chart showing which colors appear in your deck and how often
 - **Mana curve analysis** - Average mana value and distribution across mana costs
-- **Visual mana curve** - ASCII bar chart showing your deck's curve
+- **Visual mana curve** - Interactive bar chart showing your deck's curve
 - **Missing card detection** - Reports any cards that couldn't be found
+- **Rarity breakdown** - Detailed rarity statistics
+- **Most expensive cards** - Highlights the priciest cards in your deck
 
 ## Installation 🚀
 
@@ -23,14 +25,15 @@ That's it! The program uses the free Scryfall API (no API key required).
 
 ## Usage 📋
 
-### Basic Usage
+### Command-Line Interface
 ```bash
 python3 main.py your_decklist.txt
 ```
 
-### Verbose Mode
+### Streamlit Web App
+Run the following command to start the web app:
 ```bash
-python3 main.py your_decklist.txt --verbose
+streamlit run streamlit_app.py
 ```
 
 ### Example Output
@@ -52,14 +55,19 @@ python3 main.py your_decklist.txt --verbose
 📈 MANA CURVE (Nonlands only)
    Average mana value: 2.74
    Distribution:
-      0 CMC:  1 |█
-      1 CMC: 13 |█████████████
-      2 CMC: 18 |██████████████████
-      3 CMC: 24 |████████████████████
-      4 CMC:  9 |█████████
-      5 CMC:  3 |███
-      6 CMC:  3 |███
-      7+ CMC:  1 |█
+      0 CMC:  1
+      1 CMC: 13
+      2 CMC: 18
+      3 CMC: 24
+      4 CMC:  9
+      5 CMC:  3
+      6 CMC:  3
+      7+ CMC:  1
+
+   Interactive bar chart:
+   - Displays mana curve distribution visually.
+   - Groups 7+ CMC cards together for cleaner display.
+   - Provides hover tooltips for detailed card counts.
 
 ============================================================
 ✅ Analysis complete! Successfully analyzed 100.0% of cards.
@@ -96,8 +104,9 @@ Mountain
 ## File Structure 📁
 
 ```
-deck_analyzer/
+workspace-github.com-VaqueroSH-DeckAnalyzer-1/
 ├── main.py           # Command-line interface
+├── streamlit_app.py  # Streamlit web app
 ├── scryfall_api.py   # Scryfall API client
 ├── deck_parser.py    # Decklist parsing
 ├── models.py         # Data models and analyzer
@@ -110,7 +119,7 @@ deck_analyzer/
 1. **Parse** your decklist file to extract card names and quantities
 2. **Fetch** card information from the Scryfall API (colors, mana cost, type, etc.)
 3. **Calculate** statistics including mana curve, color distribution, land ratios
-4. **Display** results in a formatted, easy-to-read report
+4. **Display** results in a formatted report or interactive visualizations
 
 ## Features in Detail 📊
 
@@ -127,13 +136,22 @@ deck_analyzer/
 ### Mana Curve
 - Calculates average mana value for nonland cards
 - Shows distribution across all mana costs
-- Visual ASCII bar chart for quick analysis
+- Interactive bar chart for quick analysis
 - Groups 7+ CMC cards together for cleaner display
 
 ### Error Handling
 - Reports cards that couldn't be found in the database
 - Handles network errors gracefully
 - Provides helpful error messages
+
+## Streamlit Visualizations 🌐
+
+The Streamlit web app provides:
+- **Interactive color pie chart** for color distribution
+- **Interactive mana curve bar chart** for mana cost analysis
+- **Detailed rarity breakdown**
+- **Most expensive cards** table
+- **Card type distribution** horizontal bar chart
 
 ## Rate Limiting ⚡
 
@@ -143,6 +161,7 @@ The program automatically rate-limits API requests to stay within Scryfall's lim
 
 - Python 3.7+
 - `requests` library (automatically installed)
+- `streamlit` library (automatically installed)
 
 ## Example Deck Analysis 🎯
 
