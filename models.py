@@ -59,7 +59,20 @@ class DeckStats:
         'B': 'Black',
         'R': 'Red',
         'G': 'Green',
-        'C': 'Colorless'
+        'C': 'Colorless',
+        # Two-color combinations (guilds)
+        'BG': 'Golgari (Black/Green)',
+        'BR': 'Rakdos (Black/Red)',
+        'BU': 'Dimir (Blue/Black)',
+        'BW': 'Orzhov (Black/White)',
+        'GR': 'Gruul (Green/Red)',
+        'GU': 'Simic (Green/Blue)',
+        'GW': 'Selesnya (Green/White)',
+        'RU': 'Izzet (Red/Blue)',
+        'RW': 'Boros (Red/White)',
+        'UW': 'Azorius (Blue/White)',
+        # Multicolor (3+)
+        'M': 'Multicolor (3+ Colors)'
     }
     
     # Mana curve
@@ -392,10 +405,20 @@ class DeckAnalyzer:
                 # Mana curve (only nonlands)
                 mana_curve[card_info.mana_value] += quantity
             
-            # Color identity (count unique cards, not copies)
+            # Color identity - improved multicolor handling
             if card_info.colors:
-                for color in card_info.colors:
-                    color_counts[color] += 1
+                # Convert colors to sorted string for consistent multicolor representation
+                color_set = sorted(card_info.colors)
+                if len(color_set) == 1:
+                    # Monocolor card
+                    color_counts[color_set[0]] += 1
+                elif len(color_set) == 2:
+                    # Two-color card - create combined identifier
+                    color_key = ''.join(color_set)
+                    color_counts[color_key] += 1
+                else:
+                    # Three or more colors - classify as multicolor
+                    color_counts['M'] += 1
             else:
                 # Card has no colors, so it's colorless
                 color_counts['C'] += 1
