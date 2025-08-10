@@ -176,6 +176,20 @@ Your Sephiroth Commander deck analysis showed:
 
 Feel free to submit issues or improvements! The codebase is modular and easy to extend.
 
+## FAQ ❓
+
+**Q: Does this work with Commander decks?**  
+A: Yes! It supports any deck size, including 100-card Commander decks.
+
+**Q: Can I analyze decks without internet?**  
+A: No. The app requires an internet connection to fetch card data from Scryfall.
+
+**Q: Is my data stored anywhere?**  
+A: No. All analysis happens locally; no deck data is uploaded or stored.
+
+**Q: What about double-faced cards?**  
+A: Fully supported. The analyzer handles transform cards, modal double-faced cards (MDFCs), split/fuse, and adventure cards.
+
 ## License 📄
 
 This project uses the free Scryfall API and respects their terms of service. Card data and images are property of Wizards of the Coast.
