@@ -396,8 +396,8 @@ class DeckAnalyzer:
             if card_info.colors:
                 for color in card_info.colors:
                     color_counts[color] += 1
-            else:
-                # Card has no colors, so it's colorless
+            elif not card_info.colors and not card_info.is_land:
+                # Card has no colors and is not a land, so it's colorless
                 color_counts['C'] += 1
             
             # Card type tracking (count unique cards, not copies)
