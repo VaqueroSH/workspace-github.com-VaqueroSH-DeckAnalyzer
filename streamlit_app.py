@@ -141,44 +141,90 @@ if analyze_button and decklist_content.strip():
             # Detailed statistics in expandable sections
             with st.expander("🎨 Color Distribution", expanded=True):
                 if stats.color_counts:
-                    # Create color chart with MTG colors
+                    # Create color chart with MTG colors - improved mapping
                     color_mapping = {
                         'W': '#FFFBD5',  # White/cream
                         'U': '#0E68AB',  # Blue
                         'B': '#150B00',  # Black/dark brown
                         'R': '#D3202A',  # Red
                         'G': '#00733E',  # Green
-                        'C': '#CCCCCC'   # Colorless/gray
+                        'C': '#CCCCCC',  # Colorless/gray
+                        # Handle multicolor combinations
+                        'WU': '#C7E1F7',  # White-Blue
+                        'WB': '#B8B8B8',  # White-Black
+                        'WR': '#FFB3BA',  # White-Red
+                        'WG': '#B3E5B3',  # White-Green
+                        'UB': '#2D4A72',  # Blue-Black
+                        'UR': '#7A4B8A',  # Blue-Red
+                        'UG': '#4A7A72',  # Blue-Green
+                        'BR': '#5A1A1A',  # Black-Red
+                        'BG': '#1A3A1A',  # Black-Green
+                        'RG': '#B36B3A',  # Red-Green
+                        'M': '#DAA520'    # Multicolor (Gold)
                     }
                     
                     color_df = []
-                    # Create a color map for the specific colors in this deck
-                    deck_color_map = {}
+                    # Create lists for the pie chart
+                    colors = []
+                    values = []
+                    labels = []
                     
-                    for color_code, count in sorted(stats.color_counts.items()):
+                    # Sort by count descending for better visual presentation
+                    sorted_colors = sorted(stats.color_counts.items(), key=lambda x: -x[1])
+                    
+                    for color_code, count in sorted_colors:
                         color_name = stats.color_names.get(color_code, color_code)
-                        percentage = (count / stats.unique_cards * 100)
-                        color_label = f"{color_name} ({color_code})"
+                        percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+                        
+                        # Create cleaner labels without redundant color codes for single colors
+                        if len(color_code) == 1 and color_code in {'W', 'U', 'B', 'R', 'G', 'C'}:
+                            color_label = color_name
+                        else:
+                            color_label = f"{color_name} ({color_code})"
                         
                         color_df.append({
                             "Color": color_label, 
                             "Cards": count, 
-                            "Percentage": percentage
+                            "Percentage": f"{percentage:.1f}%"
                         })
                         
-                        # Map the color label to its hex color
-                        deck_color_map[color_label] = color_mapping.get(color_code, '#CCCCCC')
+                        # For pie chart
+                        labels.append(color_label)
+                        values.append(count)
+                        
+                        # Determine color for this slice
+                        slice_color = color_mapping.get(color_code, '#CCCCCC')
+                        # If it's a complex multicolor, use gold
+                        if len(color_code) > 2:
+                            slice_color = color_mapping.get('M', '#DAA520')
+                        colors.append(slice_color)
                     
-                    df = pd.DataFrame(color_df)
+                    # Create pie chart using go.Pie for better color control
+                    fig = go.Figure(data=[go.Pie(
+                        labels=labels,
+                        values=values,
+                        marker_colors=colors,
+                        textinfo='label+percent',
+                        textposition='auto',
+                        hovertemplate='<b>%{label}</b><br>Cards: %{value}<br>Percentage: %{percent}<extra></extra>',
+                        showlegend=True
+                    )])
                     
-                    # Create pie chart for color distribution with explicit color mapping
-                    fig = px.pie(df, values='Cards', names='Color', 
-                                title="Color Distribution",
-                                color_discrete_map=deck_color_map)
-                    fig.update_layout(showlegend=True, height=400)
+                    fig.update_layout(
+                        title={
+                            'text': "Color Distribution",
+                            'x': 0.5,
+                            'xanchor': 'center'
+                        },
+                        height=450,
+                        margin=dict(t=50, b=50, l=50, r=50),
+                        font=dict(size=12)
+                    )
+                    
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Show data table too
+                    # Show enhanced data table
+                    df = pd.DataFrame(color_df)
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
                     st.info("No colored cards found - this appears to be a colorless deck")
