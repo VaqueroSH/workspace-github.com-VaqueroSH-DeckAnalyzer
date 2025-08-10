@@ -37,7 +37,7 @@ class ScryfallAPI:
         }
         self.cache: Dict[str, CardInfo] = {}
         self.last_request_time = 0
-        self.min_delay = 0.1  # Minimum 100ms between requests (10 req/sec max)
+        self.min_delay = 0.2  # Minimum 200ms between requests (5 req/sec max)
     
     def _make_request_with_retry(self, url: str, params: Dict, max_retries: int = 3) -> Optional[requests.Response]:
         """
@@ -60,7 +60,7 @@ class ScryfallAPI:
             
             try:
                 self.last_request_time = time.time()
-                response = requests.get(url, headers=self.headers, params=params, timeout=10)
+                response = requests.get(url, headers=self.headers, params=params, timeout=5)
                 
                 if response.status_code == 200:
                     return response

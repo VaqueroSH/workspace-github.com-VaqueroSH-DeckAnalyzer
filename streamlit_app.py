@@ -141,7 +141,7 @@ if analyze_button and decklist_content.strip():
             # Detailed statistics in expandable sections
             with st.expander("🎨 Color Distribution", expanded=True):
                 if stats.color_counts:
-                    # Create color chart with MTG colors - improved mapping
+                    # Create color chart with MTG colors - fixed mapping to match models.py
                     color_mapping = {
                         'W': '#FFFBD5',  # White/cream
                         'U': '#0E68AB',  # Blue
@@ -149,17 +149,17 @@ if analyze_button and decklist_content.strip():
                         'R': '#D3202A',  # Red
                         'G': '#00733E',  # Green
                         'C': '#CCCCCC',  # Colorless/gray
-                        # Handle multicolor combinations
-                        'WU': '#C7E1F7',  # White-Blue
-                        'WB': '#B8B8B8',  # White-Black
-                        'WR': '#FFB3BA',  # White-Red
-                        'WG': '#B3E5B3',  # White-Green
-                        'UB': '#2D4A72',  # Blue-Black
-                        'UR': '#7A4B8A',  # Blue-Red
-                        'UG': '#4A7A72',  # Blue-Green
-                        'BR': '#5A1A1A',  # Black-Red
-                        'BG': '#1A3A1A',  # Black-Green
-                        'RG': '#B36B3A',  # Red-Green
+                        # Two-color combinations matching models.py guild order
+                        'BG': '#1A3A1A',  # Golgari (Black/Green)
+                        'BR': '#5A1A1A',  # Rakdos (Black/Red)
+                        'BU': '#2D4A72',  # Dimir (Blue/Black)
+                        'BW': '#B8B8B8',  # Orzhov (Black/White)
+                        'GR': '#B36B3A',  # Gruul (Green/Red)
+                        'GU': '#4A7A72',  # Simic (Green/Blue)
+                        'GW': '#B3E5B3',  # Selesnya (Green/White)
+                        'RU': '#7A4B8A',  # Izzet (Red/Blue)
+                        'RW': '#FFB3BA',  # Boros (Red/White)
+                        'UW': '#C7E1F7',  # Azorius (Blue/White)
                         'M': '#DAA520'    # Multicolor (Gold)
                     }
                     
