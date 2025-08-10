@@ -153,23 +153,14 @@ if analyze_button and decklist_content.strip():
                     
                     color_df = []
                     for color_code, count in sorted(stats.color_counts.items()):
-                        # Exclude lands from colorless count
-                        if color_code == 'C' and stats.lands > 0:
-                            count -= stats.lands
-
-                        # Ensure colorless cards are correctly identified
-                        if color_code == 'C' and count > 0:
-                            color_name = "Colorless"
-                        else:
-                            color_name = stats.color_names.get(color_code, color_code)
-
+                        color_name = stats.color_names.get(color_code, color_code)
                         percentage = (count / stats.unique_cards * 100)
                         color_label = f"{color_name} ({color_code})"
-
+                        
                         color_df.append({
-                            "Code": color_code,
-                            "Label": color_label,
-                            "Cards": count,
+                            "Code": color_code,           # single-letter code used for color mapping
+                            "Label": color_label,         # human-friendly label shown in the legend and hover
+                            "Cards": count, 
                             "Percentage": percentage
                         })
                         
