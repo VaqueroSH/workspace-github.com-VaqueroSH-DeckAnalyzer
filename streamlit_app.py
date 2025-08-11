@@ -28,114 +28,273 @@ from deck_parser import parse_decklist
 from models import DeckAnalyzer
 
 def create_pdf_styles():
-    """Create and return custom styles for the PDF report."""
+    """Create beautiful, professional styles for the PDF report."""
     styles = getSampleStyleSheet()
     
-    # Add custom styles
-    styles.add(ParagraphStyle(
-        name='Title',
-        parent=styles['Heading1'],
-        fontSize=24,
+    # Beautiful title style
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Title'],
+        fontSize=28,
         spaceAfter=30,
-        alignment=TA_CENTER
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='section',
-        parent=styles['Heading2'],
-        fontSize=14,
-        spaceBefore=20,
-        spaceAfter=10
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='body',
-        parent=styles['Normal'],
-        fontSize=10,
-        spaceBefore=5,
-        spaceAfter=5
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='table_header',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.white,
-        alignment=TA_CENTER
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='footer',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.gray,
         alignment=TA_CENTER,
-        spaceBefore=0,
-        spaceAfter=0
-    ))
+        textColor=colors.HexColor('#2C3E50'),
+        fontName='Helvetica-Bold',
+        borderWidth=2,
+        borderColor=colors.HexColor('#3498DB'),
+        borderPadding=15,
+        backColor=colors.HexColor('#ECF0F1'),
+        borderRadius=10
+    )
     
-    return styles
+    # Elegant subtitle
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceBefore=20,
+        spaceAfter=15,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#7F8C8D'),
+        fontName='Helvetica-Oblique'
+    )
+    
+    # Professional section headers
+    section_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceBefore=25,
+        spaceAfter=12,
+        textColor=colors.HexColor('#2980B9'),
+        fontName='Helvetica-Bold',
+        borderWidth=1,
+        borderColor=colors.HexColor('#3498DB'),
+        leftIndent=10,
+        borderPadding=8,
+        backColor=colors.HexColor('#F8F9FA')
+    )
+    
+    # Clean body text
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=11,
+        spaceBefore=6,
+        spaceAfter=6,
+        leftIndent=15,
+        textColor=colors.HexColor('#2C3E50'),
+        leading=14
+    )
+    
+    # Eye-catching highlights
+    highlight_style = ParagraphStyle(
+        'Highlight',
+        parent=styles['Normal'],
+        fontSize=13,
+        textColor=colors.HexColor('#E74C3C'),
+        fontName='Helvetica-Bold',
+        spaceBefore=8,
+        spaceAfter=8,
+        leftIndent=15
+    )
+    
+    # Elegant footer
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#95A5A6'),
+        alignment=TA_CENTER,
+        spaceBefore=30
+    )
+    
+    # Stats box style
+    stats_style = ParagraphStyle(
+        'StatsBox',
+        parent=styles['Normal'],
+        fontSize=12,
+        textColor=colors.HexColor('#2C3E50'),
+        fontName='Helvetica-Bold',
+        alignment=TA_CENTER,
+        spaceBefore=10,
+        spaceAfter=10
+    )
+    
+    return {
+        'title': title_style,
+        'subtitle': subtitle_style,
+        'section': section_style,
+        'body': body_style,
+        'highlight': highlight_style,
+        'footer': footer_style,
+        'stats': stats_style
+    }
 
 def create_pdf_header(deck, styles):
-    """Create the PDF header section."""
+    """Create the PDF header section with beautiful styling."""
     elements = []
+    
+    # Get deck name with fallback
     deck_name = getattr(deck, 'name', 'Deck Analysis') or 'Deck Analysis'
-    elements.append(Paragraph(deck_name, styles['Title']))
-    elements.append(Spacer(1, 20))
+    commander = getattr(deck, 'commander', None)
+    
+    # Create title with beautiful border and background
+    elements.append(Paragraph(deck_name, styles['title']))
+    
+    # Add commander as subtitle if available
+    if commander:
+        elements.append(Paragraph(f"Commander: {commander}", styles['subtitle']))
+    
+    # Add date in subtitle style
+    date_str = datetime.now().strftime("%B %d, %Y")
+    elements.append(Paragraph(date_str, styles['subtitle']))
+    
+    elements.append(Spacer(1, 30))
     return elements
 
 def create_executive_summary(stats, styles):
-    """Create the executive summary section."""
+    """Create a beautifully formatted executive summary section."""
     elements = []
     elements.append(Paragraph("Executive Summary", styles['section']))
     
-    summary = (
-        f"Total Cards: {stats.total_cards}<br/>"
-        f"Unique Cards: {stats.unique_cards}<br/>"
-        f"Lands: {stats.lands} | Nonlands: {stats.nonlands}<br/>"
-        f"Average Mana Value: {stats.average_mana_value:.2f}<br/>"
-        f"Total Deck Value: ${stats.total_deck_value:.2f}"
-    )
-    elements.append(Paragraph(summary, styles['body']))
-    elements.append(Spacer(1, 15))
+    # Create summary stats in a visually appealing format
+    summary_parts = []
+    
+    # Stats formatting with emphasis
+    stats_data = [
+        ("Total Cards", str(stats.total_cards)),
+        ("Unique Cards", str(stats.unique_cards)),
+        ("Lands", f"{stats.lands} ({(stats.lands/stats.total_cards*100):.1f}%)"),
+        ("Nonlands", f"{stats.nonlands} ({(stats.nonlands/stats.total_cards*100):.1f}%)"),
+        ("Average Mana Value", f"{stats.average_mana_value:.2f}"),
+        ("Total Deck Value", f"${stats.total_deck_value:,.2f}")
+    ]
+    
+    for label, value in stats_data:
+        summary_parts.append(
+            f'<font color="#34495E"><b>{label}:</b></font> '
+            f'<font color="#2980B9">{value}</font>'
+        )
+    
+    # Join with bullet points for better visual separation
+    summary = "<br/><bullet>•</bullet> ".join(summary_parts)
+    
+    # Add the summary in a styled paragraph
+    elements.append(Paragraph(summary, styles['stats']))
+    elements.append(Spacer(1, 20))
     return elements
 
 def create_color_distribution(stats, styles):
-    """Create the color distribution section."""
+    """Create a visually appealing color distribution section."""
     elements = []
     elements.append(Paragraph("Color Distribution", styles['section']))
     
     if stats.color_counts:
+        # Color to hex code mapping for visual representation
+        color_hex = {
+            'W': '#F7F7F7',  # White
+            'U': '#0066BB',  # Blue
+            'B': '#333333',  # Black
+            'R': '#CC0000',  # Red
+            'G': '#00AA00',  # Green
+        }
+        
         color_text = []
         for color, count in sorted(stats.color_counts.items()):
             percentage = (count / stats.unique_cards * 100)
             color_name = stats.color_names.get(color, color)
-            color_text.append(f"{color_name} ({color}): {count} cards ({percentage:.1f}%)")
+            hex_color = color_hex.get(color, '#666666')
+            
+            # Create a colored box representation
+            bar_length = int(percentage / 2)  # Scale the bar length
+            color_bar = '█' * bar_length
+            
+            # Format with color and percentage
+            formatted_text = (
+                f'<font color="{hex_color}">{color_name}</font> '
+                f'({color}): {count} cards '
+                f'<font color="#2980B9">({percentage:.1f}%)</font> '
+                f'<font color="{hex_color}">{color_bar}</font>'
+            )
+            color_text.append(formatted_text)
+        
         elements.append(Paragraph("<br/>".join(color_text), styles['body']))
+        
+        # Add color combination summary
+        if len(stats.color_counts) > 1:
+            combo = f"{len(stats.color_counts)}-Color Deck"
+            elements.append(Spacer(1, 10))
+            elements.append(Paragraph(combo, styles['highlight']))
     else:
-        elements.append(Paragraph("This appears to be a colorless deck", styles['body']))
+        elements.append(Paragraph(
+            '<font color="#95A5A6">This appears to be a colorless deck</font>', 
+            styles['highlight']
+        ))
     
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 20))
     return elements
 
 def create_mana_curve_analysis(stats, styles):
-    """Create the mana curve analysis section."""
+    """Create a visually appealing mana curve analysis section."""
     elements = []
     elements.append(Paragraph("Mana Curve Analysis", styles['section']))
     
     if stats.mana_curve:
+        # Calculate the maximum count for scaling
+        max_count = max(stats.mana_curve.values())
+        max_cmc = max(stats.mana_curve.keys())
+        
         curve_text = []
-        for cmc in range(max(stats.mana_curve.keys()) + 1):
+        for cmc in range(max_cmc + 1):
             count = stats.mana_curve.get(cmc, 0)
             if count > 0:
-                curve_text.append(f"CMC {cmc}: {count} cards")
+                # Create a visual bar representation
+                bar_length = int((count / max_count) * 20)  # Scale to max 20 characters
+                bar = '█' * bar_length
+                
+                # Calculate percentage
+                percentage = (count / stats.nonlands * 100)
+                
+                # Format the line with the bar and percentage
+                line = (
+                    f'<font color="#2980B9">CMC {cmc}</font>: '
+                    f'{count} cards '
+                    f'<font color="#95A5A6">({percentage:.1f}%)</font> '
+                    f'<font color="#3498DB">{bar}</font>'
+                )
+                curve_text.append(line)
         
         elements.append(Paragraph("<br/>".join(curve_text), styles['body']))
-        elements.append(Paragraph(f"Average Mana Value: {stats.average_mana_value:.2f}", styles['body']))
+        
+        # Add average mana value with visual emphasis
+        avg_mv = (
+            f'<font color="#2C3E50">Average Mana Value:</font> '
+            f'<font color="#E74C3C"><b>{stats.average_mana_value:.2f}</b></font>'
+        )
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(avg_mv, styles['highlight']))
+        
+        # Add curve assessment
+        curve_assessment = ""
+        if stats.average_mana_value < 2.5:
+            curve_assessment = "Low curve, aggressive strategy"
+        elif stats.average_mana_value < 3.5:
+            curve_assessment = "Balanced curve, flexible strategy"
+        else:
+            curve_assessment = "High curve, control/late-game strategy"
+        
+        elements.append(Paragraph(
+            f'<font color="#7F8C8D"><i>{curve_assessment}</i></font>',
+            styles['body']
+        ))
     else:
-        elements.append(Paragraph("No nonland cards to analyze", styles['body']))
+        elements.append(Paragraph(
+            '<font color="#95A5A6">No nonland cards to analyze</font>',
+            styles['body']
+        ))
     
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 20))
     return elements
 
 def create_card_types_section(stats, styles):
@@ -157,50 +316,130 @@ def create_card_types_section(stats, styles):
     return elements
 
 def create_interaction_suite(stats, styles):
-    """Create the interaction suite section."""
+    """Create a visually appealing interaction suite section."""
     elements = []
     elements.append(Paragraph("Interaction Suite", styles['section']))
     
     if stats.interaction_counts:
-        interaction_text = []
+        # Category colors and icons for visual appeal
+        category_styles = {
+            'Removal': ('#E74C3C', '⚔️'),      # Red
+            'Tutors': ('#8E44AD', '🔍'),       # Purple
+            'Card Draw': ('#3498DB', '📚'),    # Blue
+            'Ramp': ('#27AE60', '💎'),         # Green
+            'Protection': ('#F39C12', '🛡️')    # Orange
+        }
+        
+        total_interaction = sum(stats.interaction_counts.values())
+        
         for category in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
             if category in stats.interaction_counts:
                 count = stats.interaction_counts[category]
                 examples = stats.interaction_cards.get(category, [])[:3]
-                example_str = ", ".join(examples)
+                color, icon = category_styles.get(category, ('#95A5A6', '•'))
+                
+                # Calculate percentage
+                percentage = (count / total_interaction * 100)
+                
+                # Create header with icon and count
+                header = (
+                    f'<font color="{color}"><b>{icon} {category}</b></font>: '
+                    f'{count} cards '
+                    f'<font color="#95A5A6">({percentage:.1f}%)</font>'
+                )
+                elements.append(Paragraph(header, styles['highlight']))
+                
+                # Add examples with styled formatting
+                example_str = ", ".join([
+                    f'<font color="#2C3E50">{card}</font>'
+                    for card in examples
+                ])
                 if len(stats.interaction_cards.get(category, [])) > 3:
-                    example_str += ", ..."
-                interaction_text.append(f"{category}: {count} cards<br/>Examples: {example_str}")
-        elements.append(Paragraph("<br/><br/>".join(interaction_text), styles['body']))
+                    example_str += f', <font color="#95A5A6">and {len(stats.interaction_cards[category]) - 3} more...</font>'
+                
+                elements.append(Paragraph(
+                    f'<font color="#7F8C8D">Examples:</font> {example_str}',
+                    styles['body']
+                ))
+                elements.append(Spacer(1, 10))
+        
+        # Add total interaction summary
+        elements.append(Spacer(1, 5))
+        total_summary = (
+            f'<font color="#2C3E50"><b>Total Interaction Cards:</b></font> '
+            f'<font color="#2980B9">{total_interaction}</font> '
+            f'<font color="#95A5A6">({(total_interaction/stats.nonlands*100):.1f}% of nonlands)</font>'
+        )
+        elements.append(Paragraph(total_summary, styles['highlight']))
     else:
-        elements.append(Paragraph("No interaction data available", styles['body']))
+        elements.append(Paragraph(
+            '<font color="#95A5A6">No interaction data available</font>',
+            styles['body']
+        ))
     
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 20))
     return elements
 
 def create_expensive_cards_section(stats, styles):
-    """Create the most expensive cards section."""
+    """Create a visually appealing expensive cards section."""
     elements = []
     elements.append(Paragraph("Most Expensive Cards", styles['section']))
     
     if stats.most_expensive_cards:
-        price_text = []
+        # Calculate total deck value for percentage calculations
+        total_value = stats.total_deck_value
+        
+        # Add a summary of expensive cards
+        total_exp_value = sum(price for _, price in stats.most_expensive_cards)
+        summary = (
+            f'<font color="#2C3E50"><b>Top Cards Value:</b></font> '
+            f'<font color="#27AE60">${total_exp_value:,.2f}</font> '
+            f'<font color="#95A5A6">({(total_exp_value/total_value*100):.1f}% of total value)</font>'
+        )
+        elements.append(Paragraph(summary, styles['highlight']))
+        elements.append(Spacer(1, 10))
+        
+        # Create price entries with visual bars
+        max_price = max(price for _, price in stats.most_expensive_cards)
         for card, price in stats.most_expensive_cards:
-            price_text.append(f"{card}: ${price:.2f}")
-        elements.append(Paragraph("<br/>".join(price_text), styles['body']))
+            # Create a visual bar based on relative price
+            bar_length = int((price / max_price) * 15)  # Scale to max 15 characters
+            price_bar = '█' * bar_length
+            
+            # Format the line with price and percentage
+            percentage = (price / total_value * 100)
+            line = (
+                f'<font color="#2980B9"><b>{card}</b></font>: '
+                f'<font color="#27AE60">${price:,.2f}</font> '
+                f'<font color="#95A5A6">({percentage:.1f}%)</font> '
+                f'<font color="#3498DB">{price_bar}</font>'
+            )
+            elements.append(Paragraph(line, styles['body']))
     else:
-        elements.append(Paragraph("Price information not available", styles['body']))
+        elements.append(Paragraph(
+            '<font color="#95A5A6">Price information not available</font>',
+            styles['body']
+        ))
     
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 20))
     return elements
 
 def create_rarity_distribution(stats, styles):
-    """Create the rarity distribution section."""
+    """Create a visually appealing rarity distribution section."""
     elements = []
     elements.append(Paragraph("Rarity Distribution", styles['section']))
     
     if stats.rarity_counts:
-        rarity_text = []
+        # Rarity styling information
+        rarity_styles = {
+            'mythic': ('#FF4500', '🔥'),  # Orange-red for mythic
+            'rare': ('#FFD700', '⭐'),    # Gold for rare
+            'uncommon': ('#C0C0C0', '◆'),  # Silver for uncommon
+            'common': ('#CD853F', '●'),    # Bronze for common
+            'special': ('#FF69B4', '✧'),   # Pink for special
+            'bonus': ('#9370DB', '✦')      # Purple for bonus
+        }
+        
         rarity_order = ['mythic', 'rare', 'uncommon', 'common', 'special', 'bonus']
         rarity_names = {
             'mythic': 'Mythic Rare',
@@ -211,24 +450,56 @@ def create_rarity_distribution(stats, styles):
             'bonus': 'Bonus'
         }
         
+        # Calculate max count for bar scaling
+        max_count = max(stats.rarity_counts.values())
+        
         for rarity in rarity_order:
             if rarity in stats.rarity_counts:
                 count = stats.rarity_counts[rarity]
                 percentage = (count / stats.unique_cards * 100)
-                rarity_display = rarity_names.get(rarity, rarity.title())
-                rarity_text.append(f"{rarity_display}: {count} cards ({percentage:.1f}%)")
-        elements.append(Paragraph("<br/>".join(rarity_text), styles['body']))
+                color, icon = rarity_styles.get(rarity, ('#808080', '•'))
+                
+                # Create a visual bar
+                bar_length = int((count / max_count) * 20)  # Scale to max 20 characters
+                bar = '█' * bar_length
+                
+                # Format the rarity line
+                line = (
+                    f'<font color="{color}"><b>{icon} {rarity_names.get(rarity, rarity.title())}</b></font>: '
+                    f'{count} cards '
+                    f'<font color="#95A5A6">({percentage:.1f}%)</font> '
+                    f'<font color="{color}">{bar}</font>'
+                )
+                elements.append(Paragraph(line, styles['body']))
+        
+        # Add summary statistics
+        elements.append(Spacer(1, 10))
+        premium_count = (
+            stats.rarity_counts.get('mythic', 0) +
+            stats.rarity_counts.get('rare', 0)
+        )
+        premium_percentage = (premium_count / stats.unique_cards * 100)
+        
+        summary = (
+            f'<font color="#2C3E50"><b>Premium Cards (Mythic + Rare):</b></font> '
+            f'<font color="#F39C12">{premium_count}</font> '
+            f'<font color="#95A5A6">({premium_percentage:.1f}% of deck)</font>'
+        )
+        elements.append(Paragraph(summary, styles['highlight']))
     else:
-        elements.append(Paragraph("Rarity information not available", styles['body']))
+        elements.append(Paragraph(
+            '<font color="#95A5A6">Rarity information not available</font>',
+            styles['body']
+        ))
     
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 20))
     return elements
 
 # Utility: generate a simple PDF report for the analyzed deck
 # Returns a BytesIO buffer ready to be used in a Streamlit download_button
 
 def generate_pdf_report(deck, stats):
-    """Generate a professional, visually appealing PDF report."""
+    """Generate a beautiful and professional PDF report."""
     buffer = io.BytesIO()
     
     try:
@@ -238,8 +509,8 @@ def generate_pdf_report(deck, stats):
             pagesize=letter,
             rightMargin=0.75*inch,
             leftMargin=0.75*inch,
-            topMargin=1*inch,
-            bottomMargin=1*inch
+            topMargin=0.75*inch,  # Slightly reduced margins
+            bottomMargin=0.75*inch
         )
         
         # Get custom styles
@@ -274,18 +545,38 @@ def generate_pdf_report(deck, stats):
         
         # Add missing cards (if any)
         if stats.missing_cards:
-            elements.append(Paragraph(f"⚠️ Missing Cards ({len(stats.missing_cards)})", styles['section']))
-            missing_text = ", ".join(stats.missing_cards[:10])  # Limit to first 10
+            warning_text = (
+                f'<font color="#E74C3C">⚠️ Missing Cards</font> '
+                f'<font color="#95A5A6">({len(stats.missing_cards)})</font>'
+            )
+            elements.append(Paragraph(warning_text, styles['section']))
+            
+            # Format missing cards with ellipsis
+            displayed_cards = stats.missing_cards[:10]
+            missing_text = ", ".join([
+                f'<font color="#E74C3C">{card}</font>'
+                for card in displayed_cards
+            ])
             if len(stats.missing_cards) > 10:
-                missing_text += f"... and {len(stats.missing_cards) - 10} more"
+                missing_text += f', <font color="#95A5A6">and {len(stats.missing_cards) - 10} more...</font>'
             elements.append(Paragraph(missing_text, styles['body']))
-            elements.append(Spacer(1, 15))
+            elements.append(Spacer(1, 20))
         
-        # Add footer
-        elements.append(Spacer(1, 20))
+        # Add footer with style
+        elements.append(Spacer(1, 30))
         generation_time = datetime.now().strftime("%B %d, %Y at %I:%M %p")
-        elements.append(Paragraph(f"Report generated on {generation_time} by MTG Deck Analyzer", styles['footer']))
-        elements.append(Paragraph("Built with ❤️ using Scryfall API", styles['footer']))
+        elements.append(
+            Paragraph(
+                f'Report generated on {generation_time} by <b>MTG Deck Analyzer</b>', 
+                styles['footer']
+            )
+        )
+        elements.append(
+            Paragraph(
+                'Built with <font color="#E74C3C">❤️</font> using <font color="#3498DB">Scryfall API</font>', 
+                styles['footer']
+            )
+        )
         
         # Build the document
         doc.build(elements)
