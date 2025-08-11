@@ -12,6 +12,11 @@ A Python program and Streamlit web app that analyzes Magic: The Gathering deckli
 - **Missing card detection** - Reports any cards that couldn't be found
 - **Rarity breakdown** - Detailed rarity statistics
 - **Most expensive cards** - Highlights the priciest cards in your deck
+- **Export options** - Download analysis results as:
+  - **PDF**: A formatted report summarizing key statistics.
+  - **CSV**: Raw decklist data (Card, Quantity, Set).
+  - **JSON**: Detailed deck and analysis metadata.
+  - **ZIP**: Bundles PDF, CSV, and JSON into a single file.
 
 ## Installation 🚀
 
@@ -194,7 +199,7 @@ A: Fully supported. The analyzer handles transform cards, modal double-faced car
 A: Prices are fetched live from Scryfall and updated regularly. Prices may vary from your local store.
 
 **Q: Can I export my analysis results?**  
-A: Currently analysis is view-only. Export features are planned for future updates.
+A: Yes! You can download results as PDF, CSV, JSON, or ZIP files.
 
 **Q: What decklist formats do you support?**  
 A: MTGO exports, Arena exports, text lists, and most common formats. See examples above.
