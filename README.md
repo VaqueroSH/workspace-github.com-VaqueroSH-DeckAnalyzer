@@ -12,11 +12,8 @@ A Python program and Streamlit web app that analyzes Magic: The Gathering deckli
 - **Missing card detection** - Reports any cards that couldn't be found
 - **Rarity breakdown** - Detailed rarity statistics
 - **Most expensive cards** - Highlights the priciest cards in your deck
-- **Export options** - Download analysis results as:
-  - **PDF**: A formatted report summarizing key statistics.
-  - **CSV**: Raw decklist data (Card, Quantity, Set).
-  - **JSON**: Detailed deck and analysis metadata.
-  - **ZIP**: Bundles PDF, CSV, and JSON into a single file.
+
+> **Note:** Export options (PDF, CSV, JSON, ZIP) are currently under development and not available in this version.
 
 ## Installation 🚀
 
