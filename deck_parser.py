@@ -48,13 +48,15 @@ class DeckParser:
         """
         path = Path(file_path)
         
+        # Set deck name from file name, removing extension and replacing underscores/hyphens
+        deck_name = path.stem.replace('_', ' ').replace('-', ' ').title()
+
         if not path.exists():
             raise FileNotFoundError(f"Decklist file not found: {file_path}")
-        
+            
         cards = {}
         card_sets = {}
         commander = None
-        deck_name = path.stem  # Use filename as deck name
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -101,7 +103,13 @@ class DeckParser:
         # Try to identify commander (simple heuristic: legendary creature with quantity 1)
         # For now, we'll leave this for future enhancement
         
-        return Deck(cards=cards, card_sets=card_sets, name=deck_name, commander=commander)
+        # Create and return the Deck object with the parsed information
+        return Deck(
+            cards=cards,
+            card_sets=card_sets,
+            commander=commander,
+            name=deck_name  # Include the deck name
+        )
     
     def _should_ignore_line(self, line: str) -> bool:
         """Check if a line should be ignored during parsing."""
