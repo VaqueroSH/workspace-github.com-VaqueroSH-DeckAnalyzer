@@ -716,10 +716,13 @@ if uploaded_file is not None:
     with st.expander("Preview uploaded content"):
         st.text(decklist_content[:500] + "..." if len(decklist_content) > 500 else decklist_content)
 
+
 # Analyze button
 analyze_button = st.button("🔍 Analyze Deck", type="primary", disabled=not decklist_content.strip())
 
 if analyze_button and decklist_content.strip():
+    temp_file_path = None
+    
     try:
         # Create a temporary file for parsing
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
@@ -741,304 +744,308 @@ if analyze_button and decklist_content.strip():
                 with status_cols[i]:
                     step_indicators.append(st.empty())
         
-        try:
-            # Parse the decklist
-            status_text.text("📄 Parsing decklist...")
-            step_indicators[0].success("📄 Parse")
-            progress_bar.progress(20)
-            deck = parse_decklist(temp_file_path)
+        # Parse the decklist
+        status_text.text("📄 Parsing decklist...")
+        step_indicators[0].success("📄 Parse")
+        progress_bar.progress(20)
+        deck = parse_decklist(temp_file_path)
+        
+        # Initialize API and analyzer
+        status_text.text("🌐 Connecting to Scryfall API...")
+        step_indicators[1].info("🌐 API")
+        progress_bar.progress(40)
+        api = ScryfallAPI()
+        analyzer = DeckAnalyzer(api)
+        
+        # Analyze the deck
+        status_text.text("🔍 Analyzing deck...")
+        step_indicators[2].warning("🔍 Analyze")
+        progress_bar.progress(60)
+        
+        # Analyze the deck (no stdout output from analyzer)
+        stats = analyzer.analyze(deck)
+        
+        progress_bar.progress(100)
+        status_text.text("✅ Analysis complete!")
+        step_indicators[3].success("✅ Complete")
+        
+        # Clear progress indicators after completion
+        time.sleep(1)
+        progress_container.empty()
+        
+        # Display results - this section is now outside the try block to ensure it always shows
+        st.success(f"🎉 Successfully analyzed {stats.unique_cards} unique cards!")
+        
+        # Key metrics in columns
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("💰 Total Value", f"${stats.total_deck_value:.2f}")
+        
+        with col2:
+            st.metric("🃏 Total Cards", f"{stats.total_cards}")
+        
+        with col3:
+            st.metric("🎯 Unique Cards", f"{stats.unique_cards}")
+        
+        with col4:
+            st.metric("⚡ Avg CMC", f"{stats.average_mana_value:.2f}")
+        
+        # Detailed statistics in expandable sections
+        with st.expander("🎨 Color Distribution", expanded=True):
+            if stats.color_counts:
+                # Create color chart with MTG colors
+                color_mapping = {
+                    'W': '#FFFBD5',  # White/cream
+                    'U': '#0E68AB',  # Blue
+                    'B': '#150B00',  # Black/dark brown
+                    'R': '#D3202A',  # Red
+                    'G': '#00733E',  # Green
+                    'C': '#CCCCCC'   # Colorless/gray
+                }
+                
+                color_df = []
+                for color_code, count in sorted(stats.color_counts.items()):
+                    color_name = stats.color_names.get(color_code, color_code)
+                    percentage = (count / stats.unique_cards * 100)
+                    color_label = f"{color_name} ({color_code})"
+                    
+                    color_df.append({
+                        "Code": color_code,           # single-letter code used for color mapping
+                        "Label": color_label,         # human-friendly label shown in the legend and hover
+                        "Cards": count, 
+                        "Percentage": percentage
+                    })
+                    
+                # Ensure `df` is properly constructed
+                df = pd.DataFrame(color_df)
+
+                # Create pie chart for color distribution with explicit color mapping
+                fig = px.pie(
+                    df,
+                    values='Cards',
+                    names='Label',          # what users see
+                    color='Code',           # what Plotly uses to map colors
+                    title="Color Distribution",
+                    color_discrete_map=color_mapping
+                )
+                fig.update_layout(showlegend=True, height=400)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Show data table too
+                st.dataframe(
+                    df[["Label", "Cards", "Percentage"]].assign(Percentage=lambda d: (d["Percentage"]).map(lambda x: f"{x:.1f}%")),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No colored cards found - this appears to be a colorless deck")
+        
+        with st.expander("📈 Mana Curve", expanded=True):
+            if stats.mana_curve:
+                # Create two columns for average CMC and ideal curve info
+                curve_col1, curve_col2 = st.columns(2)
+                
+                with curve_col1:
+                    st.metric("⚡ Average CMC", f"{stats.average_mana_value:.2f}")
+                
+                with curve_col2:
+                    nonland_count = sum(stats.mana_curve.values())
+                    st.metric("🃏 Nonland Cards", nonland_count)
+                
+                # Create enhanced mana curve data
+                curve_data = []
+                all_cmc_values = list(range(8))  # 0-7+
+                
+                for cmc in all_cmc_values:
+                    if cmc == 7:
+                        # Handle 7+ CMC
+                        high_cmc_count = sum(stats.mana_curve.get(i, 0) for i in range(7, 20))
+                        curve_data.append({"CMC": "7+", "Cards": high_cmc_count, "CMC_Sort": 7})
+                    else:
+                        count = stats.mana_curve.get(cmc, 0)
+                        curve_data.append({"CMC": str(cmc), "Cards": count, "CMC_Sort": cmc})
+                
+                df = pd.DataFrame(curve_data)
+                
+                # Create interactive bar chart
+                fig = px.bar(df, x='CMC', y='Cards', 
+                            title="Mana Curve Distribution",
+                            color='Cards',
+                            color_continuous_scale='blues')
+                
+                # Customize the chart
+                fig.update_layout(
+                    xaxis_title="Converted Mana Cost",
+                    yaxis_title="Number of Cards",
+                    showlegend=False,
+                    height=400
+                )
+                
+                fig.update_traces(
+                    texttemplate='%{y}', 
+                    textposition='outside',
+                    hovertemplate='<b>%{x} CMC</b><br>Cards: %{y}<extra></extra>'
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Show ideal curve guidance
+                st.info("💡 **Ideal Curve Tips**: Most decks want more low-cost cards (1-3 CMC) than high-cost cards for consistent gameplay.")
+                
+            else:
+                st.info("No nonland cards to analyze")
+        
+        with st.expander("💎 Most Expensive Cards"):
+            if stats.most_expensive_cards:
+                expensive_data = []
+                for card_name, price in stats.most_expensive_cards:
+                    expensive_data.append({"Card": card_name, "Price": f"${price:.2f}"})
+                st.dataframe(expensive_data, use_container_width=True)
+            else:
+                st.info("Price information not available")
+        
+        with st.expander("⭐ Rarity Breakdown"):
+            if stats.rarity_counts:
+                rarity_data = []
+                rarity_order = ['mythic', 'rare', 'uncommon', 'common', 'special', 'bonus']
+                rarity_names = {
+                    'mythic': 'Mythic Rare',
+                    'rare': 'Rare', 
+                    'uncommon': 'Uncommon',
+                    'common': 'Common',
+                    'special': 'Special',
+                    'bonus': 'Bonus'
+                }
+                
+                for rarity in rarity_order:
+                    if rarity in stats.rarity_counts:
+                        count = stats.rarity_counts[rarity]
+                        percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+                        rarity_display = rarity_names.get(rarity, rarity.title())
+                        rarity_data.append({"Rarity": rarity_display, "Cards": count, "Percentage": f"{percentage:.1f}%"})
+                
+                st.dataframe(rarity_data, use_container_width=True)
+            else:
+                st.info("Rarity information not available")
+        
+        with st.expander("🎯 Interaction Suite"):
+            if stats.interaction_counts:
+                interaction_data = []
+                for interaction_type in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
+                    if interaction_type in stats.interaction_counts:
+                        count = stats.interaction_counts[interaction_type]
+                        examples = stats.interaction_cards.get(interaction_type, [])[:3]
+                        example_str = ", ".join(examples)
+                        if len(stats.interaction_cards.get(interaction_type, [])) > 3:
+                            example_str += ", ..."
+                        interaction_data.append({
+                            "Type": interaction_type, 
+                            "Count": count,
+                            "Examples": example_str
+                        })
+                st.dataframe(interaction_data, use_container_width=True)
+            else:
+                st.info("No interaction cards identified")
+        
+        with st.expander("🃏 Card Type Breakdown"):
+            if stats.card_types:
+                # Create enhanced card type visualization
+                type_data = []
+                sorted_types = sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0]))
+                
+                for card_type, count in sorted_types:
+                    percentage = (count / stats.unique_cards * 100)
+                    type_data.append({
+                        "Type": card_type, 
+                        "Cards": count, 
+                        "Percentage": percentage
+                    })
+                
+                df = pd.DataFrame(type_data)
+                
+                # Create horizontal bar chart for card types
+                fig = px.bar(df, x='Cards', y='Type', 
+                            title="Card Types Distribution",
+                            orientation='h',
+                            color='Cards',
+                            color_continuous_scale='viridis')
+                
+                fig.update_layout(
+                    xaxis_title="Number of Cards",
+                    yaxis_title="Card Type",
+                    height=max(300, len(sorted_types) * 50),
+                    showlegend=False
+                )
+                
+                fig.update_traces(
+                    texttemplate='%{x}', 
+                    textposition='outside',
+                    hovertemplate='<b>%{y}</b><br>Cards: %{x}<extra></extra>'
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Show data table with percentages
+                df_display = df.copy()
+                df_display['Percentage'] = df_display['Percentage'].apply(lambda x: f"{x:.1f}%")
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
+                
+            else:
+                st.info("No card type data available")
+        
+        # Missing cards warning
+        if stats.missing_cards:
+            with st.expander(f"⚠️ Missing Cards ({len(stats.missing_cards)})", expanded=True):
+                st.warning(f"Could not find information for {len(stats.missing_cards)} cards:")
+                for card in stats.missing_cards:
+                    st.write(f"• {card}")
+        
+        # Success rate
+        success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
+        st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
+
+        # Add a visual separator
+        st.markdown("---")
+        
+        # Enhanced export options - moved outside the try block
+        st.markdown("## 📥 Export Your Analysis")
+        st.markdown("*Save your deck analysis in multiple formats for sharing or future reference*")
+
+        # Create tabs for different export types
+        export_tab1, export_tab2, export_tab3 = st.tabs(["📊 Reports", "📋 Data Files", "🎁 Complete Package"])
+
+        # Get sanitized deck name
+        deck_name = getattr(deck, 'name', '') or 'deck'
+        deck_name = "".join(c for c in deck_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if not deck_name:
+            deck_name = 'deck'
+
+        with export_tab1:
+            st.markdown("### Professional Reports")
             
-            # Initialize API and analyzer
-            status_text.text("🌐 Connecting to Scryfall API...")
-            step_indicators[1].info("🌐 API")
-            progress_bar.progress(40)
-            api = ScryfallAPI()
-            analyzer = DeckAnalyzer(api)
-            
-            # Analyze the deck
-            status_text.text("🔍 Analyzing deck...")
-            step_indicators[2].warning("🔍 Analyze")
-            progress_bar.progress(60)
-            
-            # Analyze the deck (no stdout output from analyzer)
-            stats = analyzer.analyze(deck)
-            
-            progress_bar.progress(100)
-            status_text.text("✅ Analysis complete!")
-            step_indicators[3].success("✅ Complete")
-            
-            # Display results
-            st.success(f"🎉 Successfully analyzed {stats.unique_cards} unique cards!")
-            
-            # Key metrics in columns
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2 = st.columns(2)
             
             with col1:
-                st.metric("💰 Total Value", f"${stats.total_deck_value:.2f}")
-            
-            with col2:
-                st.metric("🃏 Total Cards", f"{stats.total_cards}")
-            
-            with col3:
-                st.metric("🎯 Unique Cards", f"{stats.unique_cards}")
-            
-            with col4:
-                st.metric("⚡ Avg CMC", f"{stats.average_mana_value:.2f}")
-            
-            # Detailed statistics in expandable sections
-            with st.expander("🎨 Color Distribution", expanded=True):
-                if stats.color_counts:
-                    # Create color chart with MTG colors
-                    color_mapping = {
-                        'W': '#FFFBD5',  # White/cream
-                        'U': '#0E68AB',  # Blue
-                        'B': '#150B00',  # Black/dark brown
-                        'R': '#D3202A',  # Red
-                        'G': '#00733E',  # Green
-                        'C': '#CCCCCC'   # Colorless/gray
-                    }
-                    
-                    color_df = []
-                    for color_code, count in sorted(stats.color_counts.items()):
-                        color_name = stats.color_names.get(color_code, color_code)
-                        percentage = (count / stats.unique_cards * 100)
-                        color_label = f"{color_name} ({color_code})"
-                        
-                        color_df.append({
-                            "Code": color_code,           # single-letter code used for color mapping
-                            "Label": color_label,         # human-friendly label shown in the legend and hover
-                            "Cards": count, 
-                            "Percentage": percentage
-                        })
-                        
-                    # Ensure `df` is properly constructed
-                    df = pd.DataFrame(color_df)
-
-                    # Create pie chart for color distribution with explicit color mapping
-                    fig = px.pie(
-                        df,
-                        values='Cards',
-                        names='Label',          # what users see
-                        color='Code',           # what Plotly uses to map colors
-                        title="Color Distribution",
-                        color_discrete_map=color_mapping
-                    )
-                    fig.update_layout(showlegend=True, height=400)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Show data table too
-                    st.dataframe(
-                        df[["Label", "Cards", "Percentage"]].assign(Percentage=lambda d: (d["Percentage"]).map(lambda x: f"{x:.1f}%")),
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                else:
-                    st.info("No colored cards found - this appears to be a colorless deck")
-            
-            with st.expander("📈 Mana Curve", expanded=True):
-                if stats.mana_curve:
-                    # Create two columns for average CMC and ideal curve info
-                    curve_col1, curve_col2 = st.columns(2)
-                    
-                    with curve_col1:
-                        st.metric("⚡ Average CMC", f"{stats.average_mana_value:.2f}")
-                    
-                    with curve_col2:
-                        nonland_count = sum(stats.mana_curve.values())
-                        st.metric("🃏 Nonland Cards", nonland_count)
-                    
-                    # Create enhanced mana curve data
-                    curve_data = []
-                    all_cmc_values = list(range(8))  # 0-7+
-                    
-                    for cmc in all_cmc_values:
-                        if cmc == 7:
-                            # Handle 7+ CMC
-                            high_cmc_count = sum(stats.mana_curve.get(i, 0) for i in range(7, 20))
-                            curve_data.append({"CMC": "7+", "Cards": high_cmc_count, "CMC_Sort": 7})
-                        else:
-                            count = stats.mana_curve.get(cmc, 0)
-                            curve_data.append({"CMC": str(cmc), "Cards": count, "CMC_Sort": cmc})
-                    
-                    df = pd.DataFrame(curve_data)
-                    
-                    # Create interactive bar chart
-                    fig = px.bar(df, x='CMC', y='Cards', 
-                                title="Mana Curve Distribution",
-                                color='Cards',
-                                color_continuous_scale='blues')
-                    
-                    # Customize the chart
-                    fig.update_layout(
-                        xaxis_title="Converted Mana Cost",
-                        yaxis_title="Number of Cards",
-                        showlegend=False,
-                        height=400
-                    )
-                    
-                    fig.update_traces(
-                        texttemplate='%{y}', 
-                        textposition='outside',
-                        hovertemplate='<b>%{x} CMC</b><br>Cards: %{y}<extra></extra>'
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Show ideal curve guidance
-                    st.info("💡 **Ideal Curve Tips**: Most decks want more low-cost cards (1-3 CMC) than high-cost cards for consistent gameplay.")
-                    
-                else:
-                    st.info("No nonland cards to analyze")
-            
-            with st.expander("💎 Most Expensive Cards"):
-                if stats.most_expensive_cards:
-                    expensive_data = []
-                    for card_name, price in stats.most_expensive_cards:
-                        expensive_data.append({"Card": card_name, "Price": f"${price:.2f}"})
-                    st.dataframe(expensive_data, use_container_width=True)
-                else:
-                    st.info("Price information not available")
-            
-            with st.expander("⭐ Rarity Breakdown"):
-                if stats.rarity_counts:
-                    rarity_data = []
-                    rarity_order = ['mythic', 'rare', 'uncommon', 'common', 'special', 'bonus']
-                    rarity_names = {
-                        'mythic': 'Mythic Rare',
-                        'rare': 'Rare', 
-                        'uncommon': 'Uncommon',
-                        'common': 'Common',
-                        'special': 'Special',
-                        'bonus': 'Bonus'
-                    }
-                    
-                    for rarity in rarity_order:
-                        if rarity in stats.rarity_counts:
-                            count = stats.rarity_counts[rarity]
-                            percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
-                            rarity_display = rarity_names.get(rarity, rarity.title())
-                            rarity_data.append({"Rarity": rarity_display, "Cards": count, "Percentage": f"{percentage:.1f}%"})
-                    
-                    st.dataframe(rarity_data, use_container_width=True)
-                else:
-                    st.info("Rarity information not available")
-            
-            with st.expander("🎯 Interaction Suite"):
-                if stats.interaction_counts:
-                    interaction_data = []
-                    for interaction_type in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
-                        if interaction_type in stats.interaction_counts:
-                            count = stats.interaction_counts[interaction_type]
-                            examples = stats.interaction_cards.get(interaction_type, [])[:3]
-                            example_str = ", ".join(examples)
-                            if len(stats.interaction_cards.get(interaction_type, [])) > 3:
-                                example_str += ", ..."
-                            interaction_data.append({
-                                "Type": interaction_type, 
-                                "Count": count,
-                                "Examples": example_str
-                            })
-                    st.dataframe(interaction_data, use_container_width=True)
-                else:
-                    st.info("No interaction cards identified")
-            
-            with st.expander("🃏 Card Type Breakdown"):
-                if stats.card_types:
-                    # Create enhanced card type visualization
-                    type_data = []
-                    sorted_types = sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0]))
-                    
-                    for card_type, count in sorted_types:
-                        percentage = (count / stats.unique_cards * 100)
-                        type_data.append({
-                            "Type": card_type, 
-                            "Cards": count, 
-                            "Percentage": percentage
-                        })
-                    
-                    df = pd.DataFrame(type_data)
-                    
-                    # Create horizontal bar chart for card types
-                    fig = px.bar(df, x='Cards', y='Type', 
-                                title="Card Types Distribution",
-                                orientation='h',
-                                color='Cards',
-                                color_continuous_scale='viridis')
-                    
-                    fig.update_layout(
-                        xaxis_title="Number of Cards",
-                        yaxis_title="Card Type",
-                        height=max(300, len(sorted_types) * 50),
-                        showlegend=False
-                    )
-                    
-                    fig.update_traces(
-                        texttemplate='%{x}', 
-                        textposition='outside',
-                        hovertemplate='<b>%{y}</b><br>Cards: %{x}<extra></extra>'
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Show data table with percentages
-                    df_display = df.copy()
-                    df_display['Percentage'] = df_display['Percentage'].apply(lambda x: f"{x:.1f}%")
-                    st.dataframe(df_display, use_container_width=True, hide_index=True)
-                    
-                else:
-                    st.info("No card type data available")
-            
-            # Missing cards warning
-            if stats.missing_cards:
-                with st.expander(f"⚠️ Missing Cards ({len(stats.missing_cards)})", expanded=True):
-                    st.warning(f"Could not find information for {len(stats.missing_cards)} cards:")
-                    for card in stats.missing_cards:
-                        st.write(f"• {card}")
-            
-            # Success rate
-            success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
-            st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
-
-            # Add a visual separator
-            st.markdown("---")
-            
-            # Enhanced export options
-            st.markdown("## 📥 Export Your Analysis")
-            st.markdown("*Save your deck analysis in multiple formats for sharing or future reference*")
-
-            # Create tabs for different export types
-            export_tab1, export_tab2, export_tab3 = st.tabs(["📊 Reports", "📋 Data Files", "🎁 Complete Package"])
-
-            # Get sanitized deck name
-            deck_name = getattr(deck, 'name', '') or 'deck'
-            deck_name = "".join(c for c in deck_name if c.isalnum() or c in (' ', '-', '_')).strip()
-            if not deck_name:
-                deck_name = 'deck'
-
-            with export_tab1:
-                st.markdown("### Professional Reports")
+                # PDF Export Card
+                st.markdown("""
+                <div style="border: 2px solid #4CAF50; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f8fff8;">
+                    <h4 style="color: #2E7D32; margin-top: 0;">📄 PDF Analysis Report</h4>
+                    <p style="color: #555; margin-bottom: 15px;">
+                        Professional formatted report with all statistics, charts, and analysis.
+                        Perfect for sharing with friends or keeping records.
+                    </p>
+                    <ul style="color: #666; margin-bottom: 15px;">
+                        <li>✅ Complete deck summary</li>
+                        <li>✅ Mana curve breakdown</li>
+                        <li>✅ Color distribution</li>
+                        <li>✅ Most expensive cards</li>
+                        <li>✅ Interaction analysis</li>
+                    </ul>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # PDF Export Card
-                    st.markdown("""
-                    <div style="border: 2px solid #4CAF50; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f8fff8;">
-                        <h4 style="color: #2E7D32; margin-top: 0;">📄 PDF Analysis Report</h4>
-                        <p style="color: #555; margin-bottom: 15px;">
-                            Professional formatted report with all statistics, charts, and analysis.
-                            Perfect for sharing with friends or keeping records.
-                        </p>
-                        <ul style="color: #666; margin-bottom: 15px;">
-                            <li>✅ Complete deck summary</li>
-                            <li>✅ Mana curve breakdown</li>
-                            <li>✅ Color distribution</li>
-                            <li>✅ Most expensive cards</li>
-                            <li>✅ Interaction analysis</li>
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
+                try:
                     pdf_buffer = generate_pdf_report(deck, stats)
                     st.download_button(
                         "📄 Generate PDF Report",
@@ -1048,29 +1055,32 @@ if analyze_button and decklist_content.strip():
                         help="Download a beautifully formatted PDF report",
                         use_container_width=True
                     )
+                except Exception as e:
+                    st.error(f"Error generating PDF: {e}")
 
-            with export_tab2:
-                st.markdown("### Raw Data Files")
-                st.markdown("*Export your deck data for use in spreadsheets, databases, or other applications*")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # CSV Export Card
-                    st.markdown("""
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
-                        <h4 style="margin-top: 0; color: white;">🧾 CSV Spreadsheet</h4>
-                        <p style="margin-bottom: 15px; opacity: 0.9;">
-                            Clean spreadsheet format with card names, quantities, and set codes.
-                            Open in Excel, Google Sheets, or any spreadsheet app.
-                        </p>
-                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                            <small>📊 Perfect for: Price tracking, inventory management, deck comparisons</small>
-                        </div>
+        with export_tab2:
+            st.markdown("### Raw Data Files")
+            st.markdown("*Export your deck data for use in spreadsheets, databases, or other applications*")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # CSV Export Card
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                    <h4 style="margin-top: 0; color: white;">🧾 CSV Spreadsheet</h4>
+                    <p style="margin-bottom: 15px; opacity: 0.9;">
+                        Clean spreadsheet format with card names, quantities, and set codes.
+                        Open in Excel, Google Sheets, or any spreadsheet app.
+                    </p>
+                    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                        <small>📊 Perfect for: Price tracking, inventory management, deck comparisons</small>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
+                </div>
+                """, unsafe_allow_html=True)
+                
+                try:
                     csv_bytes = generate_csv_export(deck)
                     st.download_button(
                         "🧾 Download CSV",
@@ -1080,23 +1090,26 @@ if analyze_button and decklist_content.strip():
                         help="Download the decklist as a CSV file",
                         use_container_width=True
                     )
-                
-                with col2:
-                    # JSON Export Card
-                    st.markdown("""
-                    <div style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); 
-                                border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
-                        <h4 style="margin-top: 0; color: white;">🧩 JSON Data</h4>
-                        <p style="margin-bottom: 15px; opacity: 0.9;">
-                            Complete deck data in JSON format.
-                            Perfect for programmatic analysis or importing into other tools.
-                        </p>
-                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                            <small>🔧 Ideal for: Developers, data analysis, custom tools</small>
-                        </div>
+                except Exception as e:
+                    st.error(f"Error generating CSV: {e}")
+            
+            with col2:
+                # JSON Export Card
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); 
+                            border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                    <h4 style="margin-top: 0; color: white;">🧩 JSON Data</h4>
+                    <p style="margin-bottom: 15px; opacity: 0.9;">
+                        Complete deck data in JSON format.
+                        Perfect for programmatic analysis or importing into other tools.
+                    </p>
+                    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                        <small>🔧 Ideal for: Developers, data analysis, custom tools</small>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
+                </div>
+                """, unsafe_allow_html=True)
+                
+                try:
                     json_bytes = generate_json_export(deck, stats)
                     st.download_button(
                         "🧩 Download JSON",
@@ -1106,27 +1119,30 @@ if analyze_button and decklist_content.strip():
                         help="Download complete analysis data",
                         use_container_width=True
                     )
+                except Exception as e:
+                    st.error(f"Error generating JSON: {e}")
 
-            with export_tab3:
-                st.markdown("### Complete Package")
-                st.markdown("*Get everything in one convenient ZIP archive*")
-                
-                st.markdown("""
-                <div style="background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%); 
-                            border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
-                    <h4 style="margin-top: 0; color: white;">📦 All-in-One Package</h4>
-                    <p style="margin-bottom: 15px; opacity: 0.9;">
-                        Download everything in a single ZIP file:
-                        • Professional PDF report
-                        • CSV spreadsheet
-                        • JSON data export
-                    </p>
-                    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px;">
-                        <small>💡 Perfect for: Archiving, sharing, or using multiple formats</small>
-                    </div>
+        with export_tab3:
+            st.markdown("### Complete Package")
+            st.markdown("*Get everything in one convenient ZIP archive*")
+            
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%); 
+                        border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                <h4 style="margin-top: 0; color: white;">📦 All-in-One Package</h4>
+                <p style="margin-bottom: 15px; opacity: 0.9;">
+                    Download everything in a single ZIP file:
+                    • Professional PDF report
+                    • CSV spreadsheet
+                    • JSON data export
+                </p>
+                <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px;">
+                    <small>💡 Perfect for: Archiving, sharing, or using multiple formats</small>
                 </div>
-                """, unsafe_allow_html=True)
-                
+            </div>
+            """, unsafe_allow_html=True)
+            
+            try:
                 zip_buffer = generate_zip_export(deck, stats)
                 st.download_button(
                     "📦 Download Complete Package",
@@ -1136,21 +1152,20 @@ if analyze_button and decklist_content.strip():
                     help="Download all formats in a ZIP file",
                     use_container_width=True
                 )
-
-        finally:
-            # Clean up temporary file
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
-            # Clear progress indicators after a short delay
-            import time
-            time.sleep(1)
-            progress_container.empty()
-            
+            except Exception as e:
+                st.error(f"Error generating ZIP package: {e}")
+                
     except Exception as e:
         st.error(f"❌ Error analyzing deck: {e}")
         if show_verbose:
             st.exception(e)
-
+            
+    finally:
+        # Clean up temporary file
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+            
+    
 # Footer
 st.markdown("---")
 st.markdown("### 🎉 Share Your Results!")
