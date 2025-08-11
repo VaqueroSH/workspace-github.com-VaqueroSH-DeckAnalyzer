@@ -3,142 +3,295 @@
 Streamlit MTG Deck Analyzer - Web App Version
 """
 
-import streamlit as st
 from pathlib import Path
-import tempfile
-import os
-import plotly.express as px
-import plotly.graph_objects as go
-import pandas as pd
 
 # Added for export PDF
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from datetime import datetime
 import io
 import json
 import zipfile
+import tempfile
+import time
+import os
+import pandas as pd
+import plotly.express as px
+import streamlit as st
 
 from scryfall_api import ScryfallAPI
 from deck_parser import parse_decklist
 from models import DeckAnalyzer
 
+def create_pdf_styles():
+    """Create and return custom styles for the PDF report."""
+    styles = getSampleStyleSheet()
+    
+    # Add custom styles
+    styles.add(ParagraphStyle(
+        name='Title',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=TA_CENTER
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='section',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceBefore=20,
+        spaceAfter=10
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='body',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceBefore=5,
+        spaceAfter=5
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='table_header',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.white,
+        alignment=TA_CENTER
+    ))
+    
+    styles.add(ParagraphStyle(
+        name='footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.gray,
+        alignment=TA_CENTER,
+        spaceBefore=0,
+        spaceAfter=0
+    ))
+    
+    return styles
+
+def create_pdf_header(deck, styles):
+    """Create the PDF header section."""
+    elements = []
+    deck_name = getattr(deck, 'name', 'Deck Analysis') or 'Deck Analysis'
+    elements.append(Paragraph(deck_name, styles['Title']))
+    elements.append(Spacer(1, 20))
+    return elements
+
+def create_executive_summary(stats, styles):
+    """Create the executive summary section."""
+    elements = []
+    elements.append(Paragraph("Executive Summary", styles['section']))
+    
+    summary = (
+        f"Total Cards: {stats.total_cards}<br/>"
+        f"Unique Cards: {stats.unique_cards}<br/>"
+        f"Lands: {stats.lands} | Nonlands: {stats.nonlands}<br/>"
+        f"Average Mana Value: {stats.average_mana_value:.2f}<br/>"
+        f"Total Deck Value: ${stats.total_deck_value:.2f}"
+    )
+    elements.append(Paragraph(summary, styles['body']))
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_color_distribution(stats, styles):
+    """Create the color distribution section."""
+    elements = []
+    elements.append(Paragraph("Color Distribution", styles['section']))
+    
+    if stats.color_counts:
+        color_text = []
+        for color, count in sorted(stats.color_counts.items()):
+            percentage = (count / stats.unique_cards * 100)
+            color_name = stats.color_names.get(color, color)
+            color_text.append(f"{color_name} ({color}): {count} cards ({percentage:.1f}%)")
+        elements.append(Paragraph("<br/>".join(color_text), styles['body']))
+    else:
+        elements.append(Paragraph("This appears to be a colorless deck", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_mana_curve_analysis(stats, styles):
+    """Create the mana curve analysis section."""
+    elements = []
+    elements.append(Paragraph("Mana Curve Analysis", styles['section']))
+    
+    if stats.mana_curve:
+        curve_text = []
+        for cmc in range(max(stats.mana_curve.keys()) + 1):
+            count = stats.mana_curve.get(cmc, 0)
+            if count > 0:
+                curve_text.append(f"CMC {cmc}: {count} cards")
+        
+        elements.append(Paragraph("<br/>".join(curve_text), styles['body']))
+        elements.append(Paragraph(f"Average Mana Value: {stats.average_mana_value:.2f}", styles['body']))
+    else:
+        elements.append(Paragraph("No nonland cards to analyze", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_card_types_section(stats, styles):
+    """Create the card types section."""
+    elements = []
+    elements.append(Paragraph("Card Type Distribution", styles['section']))
+    
+    if stats.card_types:
+        type_text = []
+        sorted_types = sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0]))
+        for card_type, count in sorted_types:
+            percentage = (count / stats.unique_cards * 100)
+            type_text.append(f"{card_type}: {count} cards ({percentage:.1f}%)")
+        elements.append(Paragraph("<br/>".join(type_text), styles['body']))
+    else:
+        elements.append(Paragraph("No card type data available", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_interaction_suite(stats, styles):
+    """Create the interaction suite section."""
+    elements = []
+    elements.append(Paragraph("Interaction Suite", styles['section']))
+    
+    if stats.interaction_counts:
+        interaction_text = []
+        for category in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
+            if category in stats.interaction_counts:
+                count = stats.interaction_counts[category]
+                examples = stats.interaction_cards.get(category, [])[:3]
+                example_str = ", ".join(examples)
+                if len(stats.interaction_cards.get(category, [])) > 3:
+                    example_str += ", ..."
+                interaction_text.append(f"{category}: {count} cards<br/>Examples: {example_str}")
+        elements.append(Paragraph("<br/><br/>".join(interaction_text), styles['body']))
+    else:
+        elements.append(Paragraph("No interaction data available", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_expensive_cards_section(stats, styles):
+    """Create the most expensive cards section."""
+    elements = []
+    elements.append(Paragraph("Most Expensive Cards", styles['section']))
+    
+    if stats.most_expensive_cards:
+        price_text = []
+        for card, price in stats.most_expensive_cards:
+            price_text.append(f"{card}: ${price:.2f}")
+        elements.append(Paragraph("<br/>".join(price_text), styles['body']))
+    else:
+        elements.append(Paragraph("Price information not available", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
+def create_rarity_distribution(stats, styles):
+    """Create the rarity distribution section."""
+    elements = []
+    elements.append(Paragraph("Rarity Distribution", styles['section']))
+    
+    if stats.rarity_counts:
+        rarity_text = []
+        rarity_order = ['mythic', 'rare', 'uncommon', 'common', 'special', 'bonus']
+        rarity_names = {
+            'mythic': 'Mythic Rare',
+            'rare': 'Rare',
+            'uncommon': 'Uncommon',
+            'common': 'Common',
+            'special': 'Special',
+            'bonus': 'Bonus'
+        }
+        
+        for rarity in rarity_order:
+            if rarity in stats.rarity_counts:
+                count = stats.rarity_counts[rarity]
+                percentage = (count / stats.unique_cards * 100)
+                rarity_display = rarity_names.get(rarity, rarity.title())
+                rarity_text.append(f"{rarity_display}: {count} cards ({percentage:.1f}%)")
+        elements.append(Paragraph("<br/>".join(rarity_text), styles['body']))
+    else:
+        elements.append(Paragraph("Rarity information not available", styles['body']))
+    
+    elements.append(Spacer(1, 15))
+    return elements
+
 # Utility: generate a simple PDF report for the analyzed deck
 # Returns a BytesIO buffer ready to be used in a Streamlit download_button
 
 def generate_pdf_report(deck, stats):
-    styles = getSampleStyleSheet()
+    """Generate a professional, visually appealing PDF report."""
     buffer = io.BytesIO()
     
     try:
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-
-        elements = []
-
-        deck_name = getattr(deck, 'name', 'Deck') or 'Deck'
-        elements.append(Paragraph(f"{deck_name} - Analysis Report", styles['Title']))
-        elements.append(Spacer(1, 12))
-
-        # Summary
-        summary = (
-            f"Total Cards: {stats.total_cards} | "
-            f"Unique: {stats.unique_cards} | "
-            f"Lands: {stats.lands} | "
-            f"Nonlands: {stats.nonlands} | "
-            f"Avg CMC: {stats.average_mana_value:.2f} | "
-            f"Total Value: ${stats.total_deck_value:.2f}"
+        # Create document with custom margins
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=letter,
+            rightMargin=0.75*inch,
+            leftMargin=0.75*inch,
+            topMargin=1*inch,
+            bottomMargin=1*inch
         )
-        elements.append(Paragraph("Summary", styles['Heading2']))
-        elements.append(Paragraph(summary, styles['Normal']))
-        elements.append(Spacer(1, 10))
-
-        # Color distribution
-        elements.append(Paragraph("Color Distribution", styles['Heading2']))
-        if getattr(stats, 'color_counts', None):
-            color_lines = []
-            for c, cnt in stats.color_counts.items():
-                color_name = stats.color_names.get(c, c)
-                color_lines.append(f"• {color_name} ({c}): {cnt}")
-            elements.append(Paragraph("<br/>".join(color_lines), styles['Normal']))
-        else:
-            elements.append(Paragraph("Colorless or no color data.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Mana curve
-        elements.append(Paragraph("Mana Curve", styles['Heading2']))
-        if getattr(stats, 'mana_curve', None):
-            curve_lines = []
-            for mv in sorted(stats.mana_curve.keys()):
-                label = "7+" if mv >= 7 else str(mv)
-                curve_lines.append(f"• {label} CMC: {stats.mana_curve[mv]}")
-            elements.append(Paragraph("<br/>".join(curve_lines), styles['Normal']))
-        else:
-            elements.append(Paragraph("No nonland cards to analyze.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Card types
-        elements.append(Paragraph("Card Types", styles['Heading2']))
-        if getattr(stats, 'card_types', None):
-            type_lines = []
-            for t, cnt in sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0])):
-                pct = (cnt / stats.unique_cards * 100) if stats.unique_cards else 0
-                type_lines.append(f"• {t}: {cnt} ({pct:.1f}%)")
-            elements.append(Paragraph("<br/>".join(type_lines), styles['Normal']))
-        else:
-            elements.append(Paragraph("No card type data available.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Rarity
-        elements.append(Paragraph("Rarity Breakdown", styles['Heading2']))
-        if getattr(stats, 'rarity_counts', None):
-            rarity_lines = []
-            for r, cnt in stats.rarity_counts.items():
-                rarity_lines.append(f"• {r.title()}: {cnt}")
-            elements.append(Paragraph("<br/>".join(rarity_lines), styles['Normal']))
-        else:
-            elements.append(Paragraph("No rarity data available.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Interaction suite
-        elements.append(Paragraph("Interaction Suite", styles['Heading2']))
-        if getattr(stats, 'interaction_counts', None):
-            inter_lines = []
-            for k in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
-                if k in stats.interaction_counts:
-                    examples = stats.interaction_cards.get(k, [])[:5]
-                    example_str = ", ".join(examples)
-                    if len(stats.interaction_cards.get(k, [])) > 5:
-                        example_str += ", ..."
-                    inter_lines.append(f"• {k}: {stats.interaction_counts[k]}" + (f" — {example_str}" if example_str else ""))
-            if inter_lines:
-                elements.append(Paragraph("<br/>".join(inter_lines), styles['Normal']))
-            else:
-                elements.append(Paragraph("No interaction cards identified.", styles['Normal']))
-        else:
-            elements.append(Paragraph("No interaction data available.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Most expensive cards
-        elements.append(Paragraph("Most Expensive Cards", styles['Heading2']))
-        if getattr(stats, 'most_expensive_cards', None):
-            price_lines = [f"• {name}: ${price:.2f}" for name, price in stats.most_expensive_cards]
-            elements.append(Paragraph("<br/>".join(price_lines), styles['Normal']))
-        else:
-            elements.append(Paragraph("Price information not available.", styles['Normal']))
-        elements.append(Spacer(1, 8))
-
-        # Missing cards
-        if getattr(stats, 'missing_cards', None):
-            if stats.missing_cards:
-                elements.append(Paragraph(f"Missing Cards ({len(stats.missing_cards)})", styles['Heading2']))
-                miss_lines = [f"• {c}" for c in stats.missing_cards]
-                elements.append(Paragraph("<br/>".join(miss_lines), styles['Normal']))
-                elements.append(Spacer(1, 8))
-
+        
+        # Get custom styles
+        styles = create_pdf_styles()
+        
+        # Build all sections
+        elements = []
+        
+        # Add header and title
+        elements.extend(create_pdf_header(deck, styles))
+        
+        # Add executive summary
+        elements.extend(create_executive_summary(stats, styles))
+        
+        # Add color distribution
+        elements.extend(create_color_distribution(stats, styles))
+        
+        # Add mana curve analysis
+        elements.extend(create_mana_curve_analysis(stats, styles))
+        
+        # Add card types breakdown
+        elements.extend(create_card_types_section(stats, styles))
+        
+        # Add interaction suite
+        elements.extend(create_interaction_suite(stats, styles))
+        
+        # Add most expensive cards
+        elements.extend(create_expensive_cards_section(stats, styles))
+        
+        # Add rarity distribution
+        elements.extend(create_rarity_distribution(stats, styles))
+        
+        # Add missing cards (if any)
+        if stats.missing_cards:
+            elements.append(Paragraph(f"⚠️ Missing Cards ({len(stats.missing_cards)})", styles['section']))
+            missing_text = ", ".join(stats.missing_cards[:10])  # Limit to first 10
+            if len(stats.missing_cards) > 10:
+                missing_text += f"... and {len(stats.missing_cards) - 10} more"
+            elements.append(Paragraph(missing_text, styles['body']))
+            elements.append(Spacer(1, 15))
+        
+        # Add footer
+        elements.append(Spacer(1, 20))
+        generation_time = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+        elements.append(Paragraph(f"Report generated on {generation_time} by MTG Deck Analyzer", styles['footer']))
+        elements.append(Paragraph("Built with ❤️ using Scryfall API", styles['footer']))
+        
         # Build the document
         doc.build(elements)
         buffer.seek(0)
         return buffer.getvalue()
+        
     finally:
         buffer.close()
 
@@ -471,7 +624,7 @@ if analyze_button and decklist_content.strip():
                     for rarity in rarity_order:
                         if rarity in stats.rarity_counts:
                             count = stats.rarity_counts[rarity]
-                            percentage = (count / stats.unique_cards * 100)
+                            percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
                             rarity_display = rarity_names.get(rarity, rarity.title())
                             rarity_data.append({"Rarity": rarity_display, "Cards": count, "Percentage": f"{percentage:.1f}%"})
                     
@@ -555,9 +708,12 @@ if analyze_button and decklist_content.strip():
             success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
             st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
             
-            # Export options
-            st.markdown("### 📥 Export Options")
-            export_cols = st.columns([1, 1, 1, 1])
+            # Enhanced export options
+            st.markdown("## 📥 Export Your Analysis")
+            st.markdown("*Save your deck analysis in multiple formats for sharing or future reference*")
+
+            # Create tabs for different export types
+            export_tab1, export_tab2, export_tab3 = st.tabs(["📊 Reports", "📋 Data Files", "🎁 Complete Package"])
 
             # Get sanitized deck name
             deck_name = getattr(deck, 'name', '') or 'deck'
@@ -565,48 +721,126 @@ if analyze_button and decklist_content.strip():
             if not deck_name:
                 deck_name = 'deck'
 
-            with export_cols[0]:
-                # Direct PDF download
-                pdf_buffer = generate_pdf_report(deck, stats)
-                st.download_button(
-                    "📄 Download PDF",
-                    data=pdf_buffer,
-                    file_name=f"{deck_name}_analysis.pdf",
-                    mime="application/pdf",
-                    help="Download a formatted PDF report with all analysis results"
-                )
+            with export_tab1:
+                st.markdown("### Professional Reports")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # PDF Export Card
+                    st.markdown("""
+                    <div style="border: 2px solid #4CAF50; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f8fff8;">
+                        <h4 style="color: #2E7D32; margin-top: 0;">📄 PDF Analysis Report</h4>
+                        <p style="color: #555; margin-bottom: 15px;">
+                            Professional formatted report with all statistics, charts, and analysis.
+                            Perfect for sharing with friends or keeping records.
+                        </p>
+                        <ul style="color: #666; margin-bottom: 15px;">
+                            <li>✅ Complete deck summary</li>
+                            <li>✅ Mana curve breakdown</li>
+                            <li>✅ Color distribution</li>
+                            <li>✅ Most expensive cards</li>
+                            <li>✅ Interaction analysis</li>
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    pdf_buffer = generate_pdf_report(deck, stats)
+                    st.download_button(
+                        "📄 Generate PDF Report",
+                        data=pdf_buffer,
+                        file_name=f"{deck_name}_analysis.pdf",
+                        mime="application/pdf",
+                        help="Download a beautifully formatted PDF report",
+                        use_container_width=True
+                    )
 
-            with export_cols[1]:
-                # Direct CSV download
-                csv_bytes = generate_csv_export(deck)
-                st.download_button(
-                    "🧾 Download CSV",
-                    data=csv_bytes,
-                    file_name=f"{deck_name}_deck.csv",
-                    mime="text/csv",
-                    help="Download the decklist as a CSV file with card names, quantities, and set codes"
-                )
+            with export_tab2:
+                st.markdown("### Raw Data Files")
+                st.markdown("*Export your deck data for use in spreadsheets, databases, or other applications*")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # CSV Export Card
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                        <h4 style="margin-top: 0; color: white;">🧾 CSV Spreadsheet</h4>
+                        <p style="margin-bottom: 15px; opacity: 0.9;">
+                            Clean spreadsheet format with card names, quantities, and set codes.
+                            Open in Excel, Google Sheets, or any spreadsheet app.
+                        </p>
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <small>📊 Perfect for: Price tracking, inventory management, deck comparisons</small>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    csv_bytes = generate_csv_export(deck)
+                    st.download_button(
+                        "🧾 Download CSV",
+                        data=csv_bytes,
+                        file_name=f"{deck_name}_deck.csv",
+                        mime="text/csv",
+                        help="Download the decklist as a CSV file",
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # JSON Export Card
+                    st.markdown("""
+                    <div style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); 
+                                border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                        <h4 style="margin-top: 0; color: white;">🧩 JSON Data</h4>
+                        <p style="margin-bottom: 15px; opacity: 0.9;">
+                            Complete deck data in JSON format.
+                            Perfect for programmatic analysis or importing into other tools.
+                        </p>
+                        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                            <small>🔧 Ideal for: Developers, data analysis, custom tools</small>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    json_bytes = generate_json_export(deck, stats)
+                    st.download_button(
+                        "🧩 Download JSON",
+                        data=json_bytes,
+                        file_name=f"{deck_name}_summary.json",
+                        mime="application/json",
+                        help="Download complete analysis data",
+                        use_container_width=True
+                    )
 
-            with export_cols[2]:
-                # Direct JSON download
-                json_bytes = generate_json_export(deck, stats)
-                st.download_button(
-                    "🧩 Download JSON",
-                    data=json_bytes,
-                    file_name=f"{deck_name}_summary.json",
-                    mime="application/json",
-                    help="Download complete analysis data in JSON format"
-                )
-
-            with export_cols[3]:
-                # Direct ZIP download
+            with export_tab3:
+                st.markdown("### Complete Package")
+                st.markdown("*Get everything in one convenient ZIP archive*")
+                
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%); 
+                            border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+                    <h4 style="margin-top: 0; color: white;">📦 All-in-One Package</h4>
+                    <p style="margin-bottom: 15px; opacity: 0.9;">
+                        Download everything in a single ZIP file:
+                        • Professional PDF report
+                        • CSV spreadsheet
+                        • JSON data export
+                    </p>
+                    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px;">
+                        <small>💡 Perfect for: Archiving, sharing, or using multiple formats</small>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 zip_buffer = generate_zip_export(deck, stats)
                 st.download_button(
-                    "📦 Download All",
+                    "📦 Download Complete Package",
                     data=zip_buffer,
                     file_name=f"{deck_name}_exports.zip",
                     mime="application/zip",
-                    help="Download all formats (PDF, CSV, JSON) in a single ZIP file"
+                    help="Download all formats in a ZIP file",
+                    use_container_width=True
                 )
 
         finally:
@@ -627,205 +861,3 @@ if analyze_button and decklist_content.strip():
 st.markdown("---")
 st.markdown("### 🎉 Share Your Results!")
 st.markdown("Built with ❤️ using [Streamlit](https://streamlit.io) and [Scryfall API](https://scryfall.com/docs/api)")
-
-# Export options with enhanced UI
-st.markdown("---")
-st.markdown("## 📥 Export Your Analysis")
-st.markdown("*Save your deck analysis in multiple formats for sharing or future reference*")
-
-# Create tabs for different export types
-export_tab1, export_tab2, export_tab3 = st.tabs(["📊 Reports", "📋 Data Files", "🎁 Complete Package"])
-
-with export_tab1:
-    st.markdown("### Professional Reports")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # PDF Export Card
-        with st.container():
-            st.markdown("""
-            <div style="border: 2px solid #4CAF50; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f8fff8;">
-                <h4 style="color: #2E7D32; margin-top: 0;">📄 PDF Analysis Report</h4>
-                <p style="color: #555; margin-bottom: 15px;">
-                    Professional formatted report with all statistics, charts, and analysis.
-                    Perfect for sharing with friends or keeping records.
-                </p>
-                <ul style="color: #666; margin-bottom: 15px;">
-                    <li>✅ Complete deck summary</li>
-                    <li>✅ Mana curve breakdown</li>
-                    <li>✅ Color distribution</li>
-                    <li>✅ Most expensive cards</li>
-                    <li>✅ Interaction analysis</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            pdf_buffer = generate_pdf_report(deck, stats)
-            st.download_button(
-                "📄 Generate PDF Report",
-                data=pdf_buffer,
-                file_name=f"{deck_name}_analysis.pdf",
-                mime="application/pdf",
-                help="Download a beautifully formatted PDF report",
-                use_container_width=True
-            )
-    
-    with col2:
-        # Image Export Card (placeholder for future feature)
-        with st.container():
-            st.markdown("""
-            <div style="border: 2px solid #2196F3; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f0f8ff;">
-                <h4 style="color: #1976D2; margin-top: 0;">🖼️ Visual Summary (Coming Soon)</h4>
-                <p style="color: #555; margin-bottom: 15px;">
-                    Shareable image with key deck statistics and mana curve visualization.
-                    Perfect for social media and Discord!
-                </p>
-                <ul style="color: #666; margin-bottom: 15px;">
-                    <li>🔲 Deck overview graphic</li>
-                    <li>🔲 Mana curve chart</li>
-                    <li>🔲 Color pie visualization</li>
-                    <li>🔲 Social media ready</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.button(
-                "🖼️ Generate Image (Soon!)",
-                disabled=True,
-                help="Image export coming in next update!",
-                use_container_width=True
-            )
-
-with export_tab2:
-    st.markdown("### Raw Data Files")
-    st.markdown("*Export your deck data for use in spreadsheets, databases, or other applications*")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # CSV Export
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
-            <h4 style="margin-top: 0; color: white;">🧾 CSV Spreadsheet</h4>
-            <p style="margin-bottom: 15px; opacity: 0.9;">
-                Clean spreadsheet format with card names, quantities, and set codes.
-                Open in Excel, Google Sheets, or any spreadsheet app.
-            </p>
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                <small>📊 Perfect for: Price tracking, inventory management, deck comparisons</small>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        csv_bytes = generate_csv_export(deck)
-        st.download_button(
-            "📊 Download CSV File",
-            data=csv_bytes,
-            file_name=f"{deck_name}_deck.csv",
-            mime="text/csv",
-            help="Download as comma-separated values file",
-            use_container_width=True
-        )
-    
-    with col2:
-        # JSON Export
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                    border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
-            <h4 style="margin-top: 0; color: white;">🧩 JSON Data</h4>
-            <p style="margin-bottom: 15px; opacity: 0.9;">
-                Complete analysis data in JSON format.
-                Perfect for developers and advanced users.
-            </p>
-            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                <small>⚙️ Perfect for: APIs, custom tools, data analysis</small>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        json_bytes = generate_json_export(deck, stats)
-        st.download_button(
-            "🧩 Download JSON File",
-            data=json_bytes,
-            file_name=f"{deck_name}_summary.json",
-            mime="application/json",
-            help="Download complete data in JSON format",
-            use_container_width=True
-        )
-
-with export_tab3:
-    st.markdown("### 🎁 Everything in One Package")
-    
-    # Big attractive ZIP download section
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%); 
-                border-radius: 20px; padding: 30px; margin: 20px 0; text-align: center;">
-        <h3 style="margin-top: 0; color: #333;">📦 Complete Export Package</h3>
-        <p style="font-size: 18px; color: #555; margin-bottom: 20px;">
-            Get everything at once! This package includes all formats in a convenient ZIP file.
-        </p>
-        <div style="display: flex; justify-content: space-around; margin: 20px 0;">
-            <div style="text-align: center;">
-                <div style="font-size: 24px;">📄</div>
-                <small style="color: #666;">PDF Report</small>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 24px;">📊</div>
-                <small style="color: #666;">CSV Data</small>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 24px;">🧩</div>
-                <small style="color: #666;">JSON File</small>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Create three columns for the download button (centered)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        zip_buffer = generate_zip_export(deck, stats)
-        st.download_button(
-            "🎁 Download Complete Package",
-            data=zip_buffer,
-            file_name=f"{deck_name}_complete_export.zip",
-            mime="application/zip",
-            help="Download PDF, CSV, and JSON files in one ZIP package",
-            use_container_width=True,
-            type="primary"
-        )
-        
-        # File size info
-        zip_size_mb = len(zip_buffer) / (1024 * 1024)
-        st.caption(f"📏 Package size: ~{zip_size_mb:.1f}MB")
-
-# Quick stats about export
-st.markdown("---")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("""
-    <div style="text-align: center; padding: 15px;">
-        <h4 style="color: #4CAF50;">📈 Analysis Complete</h4>
-        <p style="color: #666;">Ready to export your deck analysis</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown(f"""
-    <div style="text-align: center; padding: 15px;">
-        <h4 style="color: #2196F3;">🎯 {stats.unique_cards} Cards Analyzed</h4>
-        <p style="color: #666;">{success_rate:.1f}% success rate</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"""
-    <div style="text-align: center; padding: 15px;">
-        <h4 style="color: #FF9800;">💰 ${stats.total_deck_value:.2f} Total Value</h4>
-        <p style="color: #666;">Current market prices</p>
-    </div>
-    """, unsafe_allow_html=True)
