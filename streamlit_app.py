@@ -627,3 +627,205 @@ if analyze_button and decklist_content.strip():
 st.markdown("---")
 st.markdown("### 🎉 Share Your Results!")
 st.markdown("Built with ❤️ using [Streamlit](https://streamlit.io) and [Scryfall API](https://scryfall.com/docs/api)")
+
+# Export options with enhanced UI
+st.markdown("---")
+st.markdown("## 📥 Export Your Analysis")
+st.markdown("*Save your deck analysis in multiple formats for sharing or future reference*")
+
+# Create tabs for different export types
+export_tab1, export_tab2, export_tab3 = st.tabs(["📊 Reports", "📋 Data Files", "🎁 Complete Package"])
+
+with export_tab1:
+    st.markdown("### Professional Reports")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # PDF Export Card
+        with st.container():
+            st.markdown("""
+            <div style="border: 2px solid #4CAF50; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f8fff8;">
+                <h4 style="color: #2E7D32; margin-top: 0;">📄 PDF Analysis Report</h4>
+                <p style="color: #555; margin-bottom: 15px;">
+                    Professional formatted report with all statistics, charts, and analysis.
+                    Perfect for sharing with friends or keeping records.
+                </p>
+                <ul style="color: #666; margin-bottom: 15px;">
+                    <li>✅ Complete deck summary</li>
+                    <li>✅ Mana curve breakdown</li>
+                    <li>✅ Color distribution</li>
+                    <li>✅ Most expensive cards</li>
+                    <li>✅ Interaction analysis</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            pdf_buffer = generate_pdf_report(deck, stats)
+            st.download_button(
+                "📄 Generate PDF Report",
+                data=pdf_buffer,
+                file_name=f"{deck_name}_analysis.pdf",
+                mime="application/pdf",
+                help="Download a beautifully formatted PDF report",
+                use_container_width=True
+            )
+    
+    with col2:
+        # Image Export Card (placeholder for future feature)
+        with st.container():
+            st.markdown("""
+            <div style="border: 2px solid #2196F3; border-radius: 10px; padding: 20px; margin: 10px 0; background-color: #f0f8ff;">
+                <h4 style="color: #1976D2; margin-top: 0;">🖼️ Visual Summary (Coming Soon)</h4>
+                <p style="color: #555; margin-bottom: 15px;">
+                    Shareable image with key deck statistics and mana curve visualization.
+                    Perfect for social media and Discord!
+                </p>
+                <ul style="color: #666; margin-bottom: 15px;">
+                    <li>🔲 Deck overview graphic</li>
+                    <li>🔲 Mana curve chart</li>
+                    <li>🔲 Color pie visualization</li>
+                    <li>🔲 Social media ready</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.button(
+                "🖼️ Generate Image (Soon!)",
+                disabled=True,
+                help="Image export coming in next update!",
+                use_container_width=True
+            )
+
+with export_tab2:
+    st.markdown("### Raw Data Files")
+    st.markdown("*Export your deck data for use in spreadsheets, databases, or other applications*")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # CSV Export
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+            <h4 style="margin-top: 0; color: white;">🧾 CSV Spreadsheet</h4>
+            <p style="margin-bottom: 15px; opacity: 0.9;">
+                Clean spreadsheet format with card names, quantities, and set codes.
+                Open in Excel, Google Sheets, or any spreadsheet app.
+            </p>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <small>📊 Perfect for: Price tracking, inventory management, deck comparisons</small>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        csv_bytes = generate_csv_export(deck)
+        st.download_button(
+            "📊 Download CSV File",
+            data=csv_bytes,
+            file_name=f"{deck_name}_deck.csv",
+            mime="text/csv",
+            help="Download as comma-separated values file",
+            use_container_width=True
+        )
+    
+    with col2:
+        # JSON Export
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                    border-radius: 15px; padding: 25px; color: white; margin: 10px 0;">
+            <h4 style="margin-top: 0; color: white;">🧩 JSON Data</h4>
+            <p style="margin-bottom: 15px; opacity: 0.9;">
+                Complete analysis data in JSON format.
+                Perfect for developers and advanced users.
+            </p>
+            <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <small>⚙️ Perfect for: APIs, custom tools, data analysis</small>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        json_bytes = generate_json_export(deck, stats)
+        st.download_button(
+            "🧩 Download JSON File",
+            data=json_bytes,
+            file_name=f"{deck_name}_summary.json",
+            mime="application/json",
+            help="Download complete data in JSON format",
+            use_container_width=True
+        )
+
+with export_tab3:
+    st.markdown("### 🎁 Everything in One Package")
+    
+    # Big attractive ZIP download section
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%); 
+                border-radius: 20px; padding: 30px; margin: 20px 0; text-align: center;">
+        <h3 style="margin-top: 0; color: #333;">📦 Complete Export Package</h3>
+        <p style="font-size: 18px; color: #555; margin-bottom: 20px;">
+            Get everything at once! This package includes all formats in a convenient ZIP file.
+        </p>
+        <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+            <div style="text-align: center;">
+                <div style="font-size: 24px;">📄</div>
+                <small style="color: #666;">PDF Report</small>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 24px;">📊</div>
+                <small style="color: #666;">CSV Data</small>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 24px;">🧩</div>
+                <small style="color: #666;">JSON File</small>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Create three columns for the download button (centered)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        zip_buffer = generate_zip_export(deck, stats)
+        st.download_button(
+            "🎁 Download Complete Package",
+            data=zip_buffer,
+            file_name=f"{deck_name}_complete_export.zip",
+            mime="application/zip",
+            help="Download PDF, CSV, and JSON files in one ZIP package",
+            use_container_width=True,
+            type="primary"
+        )
+        
+        # File size info
+        zip_size_mb = len(zip_buffer) / (1024 * 1024)
+        st.caption(f"📏 Package size: ~{zip_size_mb:.1f}MB")
+
+# Quick stats about export
+st.markdown("---")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("""
+    <div style="text-align: center; padding: 15px;">
+        <h4 style="color: #4CAF50;">📈 Analysis Complete</h4>
+        <p style="color: #666;">Ready to export your deck analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"""
+    <div style="text-align: center; padding: 15px;">
+        <h4 style="color: #2196F3;">🎯 {stats.unique_cards} Cards Analyzed</h4>
+        <p style="color: #666;">{success_rate:.1f}% success rate</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown(f"""
+    <div style="text-align: center; padding: 15px;">
+        <h4 style="color: #FF9800;">💰 ${stats.total_deck_value:.2f} Total Value</h4>
+        <p style="color: #666;">Current market prices</p>
+    </div>
+    """, unsafe_allow_html=True)
