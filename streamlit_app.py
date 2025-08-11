@@ -998,6 +998,9 @@ if analyze_button and decklist_content.strip():
             # Success rate
             success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
             st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
+
+            # Add a visual separator
+            st.markdown("---")
             
             # Enhanced export options
             st.markdown("## 📥 Export Your Analysis")
