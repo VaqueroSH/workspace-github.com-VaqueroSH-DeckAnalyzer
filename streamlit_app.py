@@ -11,9 +11,195 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
+# Added for export PDF
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import io
+import json
+import zipfile
+
 from scryfall_api import ScryfallAPI
 from deck_parser import parse_decklist
 from models import DeckAnalyzer
+
+# Utility: generate a simple PDF report for the analyzed deck
+# Returns a BytesIO buffer ready to be used in a Streamlit download_button
+
+def generate_pdf_report(deck, stats):
+    styles = getSampleStyleSheet()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+    elements = []
+
+    deck_name = getattr(deck, 'name', 'Deck') or 'Deck'
+    elements.append(Paragraph(f"{deck_name} - Analysis Report", styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    # Summary
+    summary = (
+        f"Total Cards: {stats.total_cards} | "
+        f"Unique: {stats.unique_cards} | "
+        f"Lands: {stats.lands} | "
+        f"Nonlands: {stats.nonlands} | "
+        f"Avg CMC: {stats.average_mana_value:.2f} | "
+        f"Total Value: ${stats.total_deck_value:.2f}"
+    )
+    elements.append(Paragraph("Summary", styles['Heading2']))
+    elements.append(Paragraph(summary, styles['Normal']))
+    elements.append(Spacer(1, 10))
+
+    # Color distribution
+    elements.append(Paragraph("Color Distribution", styles['Heading2']))
+    if getattr(stats, 'color_counts', None):
+        color_lines = []
+        for c, cnt in stats.color_counts.items():
+            color_name = stats.color_names.get(c, c)
+            color_lines.append(f"• {color_name} ({c}): {cnt}")
+        elements.append(Paragraph("<br/>".join(color_lines), styles['Normal']))
+    else:
+        elements.append(Paragraph("Colorless or no color data.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Mana curve
+    elements.append(Paragraph("Mana Curve", styles['Heading2']))
+    if getattr(stats, 'mana_curve', None):
+        curve_lines = []
+        for mv in sorted(stats.mana_curve.keys()):
+            label = "7+" if mv >= 7 else str(mv)
+            curve_lines.append(f"• {label} CMC: {stats.mana_curve[mv]}")
+        elements.append(Paragraph("<br/>".join(curve_lines), styles['Normal']))
+    else:
+        elements.append(Paragraph("No nonland cards to analyze.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Card types
+    elements.append(Paragraph("Card Types", styles['Heading2']))
+    if getattr(stats, 'card_types', None):
+        type_lines = []
+        for t, cnt in sorted(stats.card_types.items(), key=lambda x: (-x[1], x[0])):
+            pct = (cnt / stats.unique_cards * 100) if stats.unique_cards else 0
+            type_lines.append(f"• {t}: {cnt} ({pct:.1f}%)")
+        elements.append(Paragraph("<br/>".join(type_lines), styles['Normal']))
+    else:
+        elements.append(Paragraph("No card type data available.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Rarity
+    elements.append(Paragraph("Rarity Breakdown", styles['Heading2']))
+    if getattr(stats, 'rarity_counts', None):
+        rarity_lines = []
+        for r, cnt in stats.rarity_counts.items():
+            rarity_lines.append(f"• {r.title()}: {cnt}")
+        elements.append(Paragraph("<br/>".join(rarity_lines), styles['Normal']))
+    else:
+        elements.append(Paragraph("No rarity data available.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Interaction suite
+    elements.append(Paragraph("Interaction Suite", styles['Heading2']))
+    if getattr(stats, 'interaction_counts', None):
+        inter_lines = []
+        for k in ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']:
+            if k in stats.interaction_counts:
+                examples = stats.interaction_cards.get(k, [])[:5]
+                example_str = ", ".join(examples)
+                if len(stats.interaction_cards.get(k, [])) > 5:
+                    example_str += ", ..."
+                inter_lines.append(f"• {k}: {stats.interaction_counts[k]}" + (f" — {example_str}" if example_str else ""))
+        if inter_lines:
+            elements.append(Paragraph("<br/>".join(inter_lines), styles['Normal']))
+        else:
+            elements.append(Paragraph("No interaction cards identified.", styles['Normal']))
+    else:
+        elements.append(Paragraph("No interaction data available.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Most expensive cards
+    elements.append(Paragraph("Most Expensive Cards", styles['Heading2']))
+    if getattr(stats, 'most_expensive_cards', None):
+        price_lines = [f"• {name}: ${price:.2f}" for name, price in stats.most_expensive_cards]
+        elements.append(Paragraph("<br/>".join(price_lines), styles['Normal']))
+    else:
+        elements.append(Paragraph("Price information not available.", styles['Normal']))
+    elements.append(Spacer(1, 8))
+
+    # Missing cards
+    if getattr(stats, 'missing_cards', None):
+        if stats.missing_cards:
+            elements.append(Paragraph(f"Missing Cards ({len(stats.missing_cards)})", styles['Heading2']))
+            miss_lines = [f"• {c}" for c in stats.missing_cards]
+            elements.append(Paragraph("<br/>".join(miss_lines), styles['Normal']))
+            elements.append(Spacer(1, 8))
+
+    # Build the document
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+# Utility: CSV export of the raw decklist (Card, Quantity, Set)
+# Returns raw bytes suitable for download_button
+
+def generate_csv_export(deck):
+    lines = ["Card,Quantity,Set"]
+    for card in sorted(deck.cards.keys()):
+        qty = deck.cards[card]
+        set_code = deck.card_sets.get(card, "")
+        safe_card = card.replace('"', '""')
+        lines.append(f'"{safe_card}",{qty},"{set_code}"')
+    data = "\n".join(lines)
+    return data.encode("utf-8")
+
+# Utility: JSON export of summary stats and deck metadata
+# Returns raw bytes suitable for download_button
+
+def generate_json_export(deck, stats):
+    payload = {
+        "deck": {
+            "name": getattr(deck, "name", None),
+            "commander": getattr(deck, "commander", None),
+            "total_cards": deck.total_cards,
+            "unique_cards": deck.unique_cards,
+            "cards": deck.cards,
+            "card_sets": deck.card_sets,
+        },
+        "stats": {
+            "total_cards": stats.total_cards,
+            "unique_cards": stats.unique_cards,
+            "lands": stats.lands,
+            "nonlands": stats.nonlands,
+            "color_counts": stats.color_counts,
+            "mana_curve": stats.mana_curve,
+            "average_mana_value": stats.average_mana_value,
+            "card_types": stats.card_types,
+            "total_deck_value": stats.total_deck_value,
+            "most_expensive_cards": stats.most_expensive_cards,
+            "rarity_counts": stats.rarity_counts,
+            "interaction_counts": stats.interaction_counts,
+            "interaction_cards": stats.interaction_cards,
+            "set_counts": stats.set_counts,
+            "set_names": stats.set_names,
+            "missing_cards": stats.missing_cards,
+        }
+    }
+    return json.dumps(payload, indent=2).encode("utf-8")
+
+# New: ZIP export that packages PDF, CSV, and JSON
+
+def generate_zip_export(deck, stats):
+    deck_name = getattr(deck, 'name', 'deck') or 'deck'
+    pdf_buffer = generate_pdf_report(deck, stats)
+    csv_bytes = generate_csv_export(deck)
+    json_bytes = generate_json_export(deck, stats)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{deck_name}_analysis.pdf", pdf_buffer.getvalue())
+        zf.writestr(f"{deck_name}_deck.csv", csv_bytes)
+        zf.writestr(f"{deck_name}_summary.json", json_bytes)
+    zip_buffer.seek(0)
+    return zip_buffer
 
 # Page configuration
 st.set_page_config(
@@ -352,6 +538,48 @@ if analyze_button and decklist_content.strip():
             success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
             st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
             
+            # Export PDF (user-provided pattern)
+            col1_export, col2_export, col3_export = st.columns(3)
+            with col1_export:
+                if st.button("📄 Export PDF Report"):
+                    pdf_buffer = generate_pdf_report(deck, stats)
+                    st.download_button(
+                        label="Download PDF Report",
+                        data=pdf_buffer,
+                        file_name=f"{getattr(deck, 'name', 'deck')}_analysis.pdf",
+                        mime="application/pdf"
+                    )
+            with col2_export:
+                if st.button("🧾 Export CSV (Deck)"):
+                    csv_bytes = generate_csv_export(deck)
+                    st.download_button(
+                        label="Download CSV",
+                        data=csv_bytes,
+                        file_name=f"{getattr(deck, 'name', 'deck')}_deck.csv",
+                        mime="text/csv"
+                    )
+            with col3_export:
+                if st.button("🧩 Export JSON (Summary)"):
+                    json_bytes = generate_json_export(deck, stats)
+                    st.download_button(
+                        label="Download JSON",
+                        data=json_bytes,
+                        file_name=f"{getattr(deck, 'name', 'deck')}_summary.json",
+                        mime="application/json"
+                    )
+
+            # New: Export all as ZIP
+            zip_col, _, _ = st.columns(3)
+            with zip_col:
+                if st.button("📦 Export All (ZIP)"):
+                    zip_buffer = generate_zip_export(deck, stats)
+                    st.download_button(
+                        label="Download ZIP",
+                        data=zip_buffer,
+                        file_name=f"{getattr(deck, 'name', 'deck')}_exports.zip",
+                        mime="application/zip"
+                    )
+
         finally:
             # Clean up temporary file
             if os.path.exists(temp_file_path):
