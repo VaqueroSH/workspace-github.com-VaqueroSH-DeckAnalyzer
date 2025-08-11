@@ -190,6 +190,21 @@ A: No. All analysis happens locally; no deck data is uploaded or stored.
 **Q: What about double-faced cards?**  
 A: Fully supported. The analyzer handles transform cards, modal double-faced cards (MDFCs), split/fuse, and adventure cards.
 
+**Q: How accurate is the pricing data?**  
+A: Prices are fetched live from Scryfall and updated regularly. Prices may vary from your local store.
+
+**Q: Can I export my analysis results?**  
+A: Currently analysis is view-only. Export features are planned for future updates.
+
+**Q: What decklist formats do you support?**  
+A: MTGO exports, Arena exports, text lists, and most common formats. See examples above.
+
+**Q: How often is card data updated?**  
+A: Card data is fetched live from Scryfall, so you always get the latest information.
+
+**Q: Can I analyze multiple decks at once?**  
+A: Currently one deck at a time. Deck comparison features are on the roadmap.
+
 ## License 📄
 
 This project uses the free Scryfall API and respects their terms of service. Card data and images are property of Wizards of the Coast.
