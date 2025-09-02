@@ -11,6 +11,7 @@ import os
 from scryfall_api import ScryfallAPI
 from deck_parser import parse_decklist
 from models import DeckAnalyzer
+from format_checker import FormatChecker
 
 # Page configuration
 st.set_page_config(
@@ -27,6 +28,25 @@ st.markdown("### Analyze your Magic: The Gathering decklists with detailed stati
 # Sidebar for options
 st.sidebar.header("⚙️ Options")
 show_verbose = st.sidebar.checkbox("Show detailed progress", value=False)
+
+# Format legality checker
+st.sidebar.header("⚖️ Format Legality")
+try:
+    format_checker = FormatChecker()
+    available_formats = format_checker.get_available_formats()
+    selected_format = st.sidebar.selectbox(
+        "Check format legality:",
+        ["None"] + available_formats,
+        help="Check if your deck is legal in selected format"
+    )
+
+    if selected_format != "None":
+        format_description = format_checker.get_format_description(selected_format)
+        if format_description:
+            st.sidebar.info(f"📋 {format_description}")
+except Exception as e:
+    st.sidebar.error(f"❌ Could not load format rules: {e}")
+    selected_format = "None"
 
 # Main input area
 st.header("📝 Enter Your Decklist")
@@ -240,7 +260,59 @@ if analyze_button and decklist_content.strip():
             # Success rate
             success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
             st.info(f"📊 Analysis Success Rate: {success_rate:.1f}%")
-            
+
+            # Format legality check
+            if selected_format != "None" and format_checker:
+                st.header(f"⚖️ {selected_format} Legality Check")
+
+                try:
+                    legality_report = format_checker.check_deck_legality(deck, selected_format)
+
+                    # Show summary
+                    if legality_report.legal:
+                        st.success(legality_report.get_summary())
+                    else:
+                        st.error(legality_report.get_summary())
+
+                    # Show detailed issues
+                    if legality_report.issues:
+                        st.subheader("❌ Issues Found")
+                        for issue in legality_report.issues:
+                            with st.container():
+                                col1, col2 = st.columns([1, 4])
+                                with col1:
+                                    if issue.severity == 'error':
+                                        st.error("🚫")
+                                    elif issue.severity == 'warning':
+                                        st.warning("⚠️")
+                                    else:
+                                        st.info("ℹ️")
+                                with col2:
+                                    st.write(f"**{issue.category.upper()}:** {issue.message}")
+                                    if issue.card_name:
+                                        st.write(f"*Card:* {issue.card_name}")
+                                    if issue.suggestion:
+                                        st.write(f"*Suggestion:* {issue.suggestion}")
+
+                    # Show warnings
+                    if legality_report.warnings:
+                        st.subheader("⚠️ Warnings")
+                        for warning in legality_report.warnings:
+                            st.warning(f"**{warning.category.upper()}:** {warning.message}")
+                            if warning.suggestion:
+                                st.write(f"*Suggestion:* {warning.suggestion}")
+
+                    # Show info
+                    if legality_report.info:
+                        st.subheader("ℹ️ Information")
+                        for info in legality_report.info:
+                            st.info(f"**{info.category.upper()}:** {info.message}")
+
+                except Exception as e:
+                    st.error(f"❌ Error checking legality: {e}")
+                    if show_verbose:
+                        st.exception(e)
+
         finally:
             # Clean up temporary file
             if os.path.exists(temp_file_path):
