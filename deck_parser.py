@@ -3,7 +3,7 @@ Deck list parsing utilities for Magic: The Gathering.
 """
 
 import re
-from typing import Optional
+from typing import Optional, Dict
 from pathlib import Path
 from models import Deck
 
