@@ -380,50 +380,133 @@ if analyze_button and decklist_content.strip():
 
         # Format legality check
         if selected_format != "None" and format_checker:
-            st.header(f"⚖️ {selected_format} Legality Check")
+            st.header(f"⚖️ {selected_format} Format Legality")
 
             try:
                 legality_report = format_checker.check_deck_legality(deck, selected_format)
 
-                # Show summary
-                if legality_report.legal:
-                    st.success(legality_report.get_summary())
-                else:
-                    st.error(legality_report.get_summary())
+                # Calculate legality score
+                total_issues = len(legality_report.issues) + len(legality_report.warnings)
+                error_count = len([i for i in legality_report.issues if i.severity == 'error'])
+                warning_count = len([i for i in legality_report.warnings if i.severity == 'warning'])
 
-                # Show detailed issues
-                if legality_report.issues:
-                    st.subheader("❌ Issues Found")
-                    for issue in legality_report.issues:
-                        with st.container():
-                            col1, col2 = st.columns([1, 4])
-                            with col1:
-                                if issue.severity == 'error':
-                                    st.error("🚫")
-                                elif issue.severity == 'warning':
-                                    st.warning("⚠️")
-                                else:
-                                    st.info("ℹ️")
-                            with col2:
-                                st.write(f"**{issue.category.upper()}:** {issue.message}")
-                                if issue.card_name:
-                                    st.write(f"*Card:* {issue.card_name}")
-                                if issue.suggestion:
-                                    st.write(f"*Suggestion:* {issue.suggestion}")
+                # Visual status display
+                col_status, col_score, col_stats = st.columns([2, 2, 2])
 
-                # Show warnings
-                if legality_report.warnings:
-                    st.subheader("⚠️ Warnings")
-                    for warning in legality_report.warnings:
-                        st.warning(f"**{warning.category.upper()}:** {warning.message}")
-                        if warning.suggestion:
-                            st.write(f"*Suggestion:* {warning.suggestion}")
+                with col_status:
+                    if legality_report.legal:
+                        st.success("✅ **LEGAL**")
+                        st.markdown('<div style="background-color: #d4edda; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;"><strong>🎉 All Clear!</strong><br>This deck is legal to play.</div>', unsafe_allow_html=True)
+                    else:
+                        st.error("❌ **ILLEGAL**")
+                        st.markdown('<div style="background-color: #f8d7da; padding: 10px; border-radius: 5px; border-left: 4px solid #dc3545;"><strong>⚠️ Issues Found</strong><br>Deck needs modifications.</div>', unsafe_allow_html=True)
 
-                # Show info
-                if legality_report.info:
-                    st.subheader("ℹ️ Information")
-                    for info in legality_report.info:
-                        st.info(f"**{info.category.upper()}:** {info.message}")
+                with col_score:
+                    # Legality Score (0-100, where 100 = fully legal)
+                    if legality_report.legal:
+                        score = 100
+                        score_color = "#28a745"
+                    else:
+                        # Calculate score based on issues (simple formula)
+                        if error_count > 0:
+                            score = max(0, 50 - (error_count * 10) - (warning_count * 2))
+                        else:
+                            score = max(20, 80 - (warning_count * 5))
+                        score_color = "#dc3545" if score < 50 else "#ffc107" if score < 80 else "#28a745"
+
+                    st.metric("Legality Score", f"{score}/100")
+
+                    # Visual score bar
+                    st.markdown(f"""
+                    <div style="background-color: #e9ecef; border-radius: 10px; height: 20px; width: 100%;">
+                        <div style="background-color: {score_color}; height: 20px; width: {score}%; border-radius: 10px; transition: width 0.5s;"></div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with col_stats:
+                    # Statistics cards
+                    stat_cols = st.columns(2)
+                    with stat_cols[0]:
+                        st.metric("Errors", error_count, delta=None, delta_color="inverse")
+                    with stat_cols[1]:
+                        st.metric("Warnings", warning_count, delta=None, delta_color="off")
+
+                # Detailed breakdown with enhanced visuals
+                if total_issues > 0:
+                    st.markdown("---")
+
+                    # Issues summary with tabs
+                    tab_errors, tab_warnings, tab_info = st.tabs(["🚫 Errors", "⚠️ Warnings", "ℹ️ Info"])
+
+                    with tab_errors:
+                        error_issues = [i for i in legality_report.issues if i.severity == 'error']
+                        if error_issues:
+                            for issue in error_issues:
+                                with st.container():
+                                    # Enhanced error display
+                                    st.markdown(f"""
+                                    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 5px 0;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                            <span style="font-size: 1.2em; margin-right: 8px;">🚫</span>
+                                            <strong style="color: #721c24; text-transform: uppercase; font-size: 0.9em;">{issue.category}</strong>
+                                        </div>
+                                        <div style="color: #721c24; margin-bottom: 8px;">{issue.message}</div>
+                                        {'<div style="color: #856404; font-style: italic;">💡 ' + issue.suggestion + '</div>' if issue.suggestion else ''}
+                                        {'<div style="background-color: #fff3cd; padding: 5px 10px; border-radius: 4px; margin-top: 8px; border-left: 3px solid #ffc107;"><strong>Card:</strong> ' + issue.card_name + '</div>' if issue.card_name else ''}
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                        else:
+                            st.success("✅ No errors found!")
+
+                    with tab_warnings:
+                        if legality_report.warnings:
+                            for warning in legality_report.warnings:
+                                st.markdown(f"""
+                                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 5px 0;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-size: 1.2em; margin-right: 8px;">⚠️</span>
+                                        <strong style="color: #856404; text-transform: uppercase; font-size: 0.9em;">{warning.category}</strong>
+                                    </div>
+                                    <div style="color: #856404; margin-bottom: 8px;">{warning.message}</div>
+                                    {'<div style="color: #155724; font-style: italic;">💡 ' + warning.suggestion + '</div>' if warning.suggestion else ''}
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.info("ℹ️ No warnings to report.")
+
+                    with tab_info:
+                        if legality_report.info:
+                            for info in legality_report.info:
+                                st.markdown(f"""
+                                <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 8px; padding: 15px; margin: 5px 0;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-size: 1.2em; margin-right: 8px;">ℹ️</span>
+                                        <strong style="color: #0c5460; text-transform: uppercase; font-size: 0.9em;">{info.category}</strong>
+                                    </div>
+                                    <div style="color: #0c5460;">{info.message}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.info("ℹ️ No additional information.")
+
+                # Legality checklist
+                if not legality_report.legal:
+                    st.markdown("---")
+                    st.subheader("📋 Quick Legality Checklist")
+
+                    # Create checklist items
+                    checklist_items = [
+                        ("commander_check", "✅ Has exactly 1 legendary commander", error_count == 0 and any(i.category == 'commander' and i.severity == 'error' for i in legality_report.issues) == False),
+                        ("banned_check", "✅ No banned cards in deck", len([i for i in legality_report.issues if i.category == 'banned']) == 0),
+                        ("size_check", "✅ Deck size meets requirements", len([i for i in legality_report.issues if i.category == 'construction' and 'size' in i.message.lower()]) == 0),
+                        ("copies_check", "✅ No more than 1 copy of each card", len([i for i in legality_report.issues if i.category == 'construction' and 'copies' in i.message.lower()]) == 0),
+                    ]
+
+                    for check_id, check_text, is_passed in checklist_items:
+                        if is_passed:
+                            st.markdown(f'<div style="color: #28a745;">{check_text}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'<div style="color: #dc3545;">❌ {check_text.replace("✅ ", "")}</div>', unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"❌ Error checking legality: {e}")
