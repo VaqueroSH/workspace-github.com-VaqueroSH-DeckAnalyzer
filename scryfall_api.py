@@ -26,6 +26,15 @@ class CardInfo:
         return self.colors
 
 
+@dataclass
+class CardImage:
+    """Represents image URLs for a Magic card."""
+    normal: Optional[str] = None
+    large: Optional[str] = None
+    art_crop: Optional[str] = None
+    border_crop: Optional[str] = None
+
+
 class ScryfallAPI:
     """Client for interacting with the Scryfall API."""
     
@@ -232,3 +241,40 @@ class ScryfallAPI:
                 results[card_name] = self.get_card(card_name)
         
         return results
+
+    def get_card_image(self, card_name: str, set_code: Optional[str] = None) -> Optional[CardImage]:
+        """
+        Fetch image URLs for a specific card.
+
+        Args:
+            card_name: Name of the card
+            set_code: Optional set code for specific printing
+
+        Returns:
+            CardImage object with image URLs, or None if not found
+        """
+        # First try to get the card data
+        response = self._make_request_with_retry(
+            f"{self.base_url}/cards/named",
+            {'exact': card_name, 'set': set_code} if set_code else {'exact': card_name}
+        )
+
+        if not response or response.status_code != 200:
+            return None
+
+        data = response.json()
+
+        # Extract image URLs
+        image_uris = data.get('image_uris', {})
+
+        # For double-faced cards, try to get the front face
+        if not image_uris and 'card_faces' in data:
+            front_face = data['card_faces'][0] if data['card_faces'] else {}
+            image_uris = front_face.get('image_uris', {})
+
+        return CardImage(
+            normal=image_uris.get('normal'),
+            large=image_uris.get('large'),
+            art_crop=image_uris.get('art_crop'),
+            border_crop=image_uris.get('border_crop')
+        )

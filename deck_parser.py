@@ -101,7 +101,7 @@ class DeckParser:
             raise ValueError(f"No valid cards found in {file_path}")
         
         # Try to identify commander (simple heuristic: legendary creature with quantity 1)
-        # For now, we'll leave this for future enhancement
+        commander = self._identify_commander(cards, card_sets)
         
         # Create and return the Deck object with the parsed information
         return Deck(
@@ -111,6 +111,87 @@ class DeckParser:
             name=deck_name  # Include the deck name
         )
     
+    def _identify_commander(self, cards: Dict[str, int], card_sets: Dict[str, str]) -> Optional[str]:
+        """
+        Identify the commander from a deck using various heuristics.
+
+        Args:
+            cards: Dictionary of card names to quantities
+            card_sets: Dictionary of card names to set codes
+
+        Returns:
+            Commander card name if identified, None otherwise
+        """
+        # Look for cards with quantity 1 that might be commanders
+        potential_commanders = []
+        for card_name, quantity in cards.items():
+            if quantity == 1:  # Commanders are typically single cards
+                # Check if it's a legendary creature or planeswalker
+                # We'll use simple heuristics based on common commander names
+                card_lower = card_name.lower()
+
+                # Common commander indicators
+                commander_indicators = [
+                    'legendary creature',
+                    'legendary planeswalker',
+                    'the ur-dragon',
+                    'captain sisay',
+                    'karona',
+                    'child of alara',
+                    'reaper king',
+                    'malfegor',
+                    'kaalia of the vast',
+                    'prossh',
+                    'skyfire kirin',
+                    'mayael the anima',
+                    'sharuum the hegemon',
+                    'edric',
+                    'spymaster of trest',
+                    'gaddock teeg',
+                    'melira',
+                    'sylvok outcast',
+                    'karador',
+                    'ghost chieftain',
+                    'animar',
+                    'soul of elements',
+                    'command tower',  # Sometimes used as commander
+                ]
+
+                # Check if card name suggests it's a commander
+                is_potential_commander = False
+
+                # Check for legendary indicators in card name
+                if any(indicator in card_lower for indicator in commander_indicators):
+                    is_potential_commander = True
+
+                # Check for planeswalker names
+                planeswalker_names = [
+                    'jace', 'liliana', 'chandra', 'nissa', 'gideon', 'elspeth',
+                    'ajani', 'sorin', 'tezzeret', 'venser', 'tamiyo', 'kiora',
+                    'nahiri', 'dovin', 'angrath', 'asha', 'freyalise', 'minsc'
+                ]
+                if any(pw in card_lower for pw in planeswalker_names):
+                    is_potential_commander = True
+
+                # Check for legendary creature indicators
+                legendary_indicators = [
+                    'the', 'lord', 'queen', 'king', 'master', 'archangel',
+                    'primarch', 'overseer', 'commander', 'captain', 'general'
+                ]
+                if any(indicator in card_lower for indicator in legendary_indicators):
+                    is_potential_commander = True
+
+                if is_potential_commander:
+                    potential_commanders.append(card_name)
+
+        # If we found potential commanders, return the first one
+        if potential_commanders:
+            return potential_commanders[0]
+
+        # Fallback: if no commander identified, check if there's a single legendary card
+        # This is a basic fallback that might not always be accurate
+        return None
+
     def _should_ignore_line(self, line: str) -> bool:
         """Check if a line should be ignored during parsing."""
         for pattern in self.ignore_patterns:

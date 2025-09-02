@@ -11,7 +11,7 @@ import os
 import time
 from pathlib import Path
 
-from scryfall_api import ScryfallAPI
+from scryfall_api import ScryfallAPI, CardImage
 from deck_parser import parse_decklist
 from models import DeckAnalyzer
 from format_checker import FormatChecker
@@ -178,6 +178,105 @@ elif st.session_state.current_page == 'analysis':
         except Exception as e:
             st.sidebar.error(f"❌ Could not load format rules: {e}")
             selected_format = "None"
+
+        # ===== COMMANDER BACKGROUND IMAGE =====
+        # Try to get commander and set as background
+        commander_name = None
+        commander_image_url = None
+
+        try:
+            # Parse the deck to get commander information
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(decklist_content)
+                temp_file_path = temp_file.name
+
+            deck = parse_decklist(temp_file_path)
+
+            if deck.commander:
+                commander_name = deck.commander
+                # Try to get commander's image
+                api = ScryfallAPI()
+                commander_image = api.get_card_image(commander_name, deck.card_sets.get(commander_name))
+
+                if commander_image and commander_image.art_crop:
+                    commander_image_url = commander_image.art_crop
+                elif commander_image and commander_image.normal:
+                    commander_image_url = commander_image.normal
+            else:
+                # Fallback: Try to identify commander using API
+                api = ScryfallAPI()
+                potential_commanders = []
+
+                # Look for legendary creatures or planeswalkers with quantity 1
+                for card_name, quantity in deck.cards.items():
+                    if quantity == 1:  # Commanders are typically single cards
+                        try:
+                            card_info = api.get_card(card_name, deck.card_sets.get(card_name))
+                            if card_info:
+                                # Check if it's a legendary creature or planeswalker
+                                is_legendary = 'legendary' in card_info.type_line.lower()
+                                is_planeswalker = 'planeswalker' in card_info.type_line.lower()
+
+                                if is_legendary or is_planeswalker:
+                                    potential_commanders.append((card_name, card_info))
+                        except:
+                            continue
+
+                # Use the first potential commander found
+                if potential_commanders:
+                    commander_name, commander_info = potential_commanders[0]
+                    commander_image = api.get_card_image(commander_name, deck.card_sets.get(commander_name))
+
+                    if commander_image and commander_image.art_crop:
+                        commander_image_url = commander_image.art_crop
+                    elif commander_image and commander_image.normal:
+                        commander_image_url = commander_image.normal
+
+            # Clean up temp file
+            import os
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+
+        except Exception as e:
+            # Silently handle errors - background image is optional
+            pass
+
+        # Set commander background if available
+        if commander_image_url and commander_name:
+            # Create a container with the commander background
+            st.markdown(f"""
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: -1;
+                background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(20,20,30,0.9) 100%),
+                           url('{commander_image_url}') center center / cover no-repeat;
+                opacity: 0.1;
+                pointer-events: none;
+            "></div>
+            """, unsafe_allow_html=True)
+
+            # Add commander info overlay
+            st.markdown(f"""
+            <div style="
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 10px 15px;
+                border-radius: 10px;
+                border: 1px solid rgba(255,255,255,0.2);
+                font-size: 0.9em;
+                z-index: 100;
+            ">
+                🎯 <strong>Commander:</strong> {commander_name}
+            </div>
+            """, unsafe_allow_html=True)
 
         # Full analysis implementation will go here
         st.info("🚧 Analysis dashboard implementation in progress...")

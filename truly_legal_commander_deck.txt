@@ -1,0 +1,158 @@
+1 Sephiroth, Fabled SOLDIER // Sephiroth, One-Winged Angel (FIN) 115
+1 Lightning Bolt (M21) 153
+1 Sol Ring (SLD) 2063
+1 Demonic Tutor (STA) 90
+1 Counterspell (ICE) 70
+1 Swords to Plowshares (EMA) 33
+1 Dark Ritual (ICE) 119
+1 Brainstorm (ICE) 61
+1 Llanowar Elves (M21) 219
+1 Birds of Paradise (MKC) 155
+1 Deathrite Shaman (RVR) 191
+1 Noble Hierarch (MH2) 232
+1 Priest of Titania (USG) 270
+1 Elvish Mystic (M21) 216
+1 Fyndhorn Elves (ICE) 241
+1 Wall of Roots (TSR) 238
+1 Sakura-Tribe Elder (NEC) 165
+1 Eternal Witness (5DN) 86
+1 Reanimate (DMU) 102
+1 Entomb (ODY) 129
+1 Careful Study (ODY) 70
+1 Impulse (VIS) 35
+1 Ponder (LRW) 79
+1 Preordain (M11) 70
+1 Serum Visions (5DN) 36
+1 Gitaxian Probe (NPH) 35
+1 Mental Note (JUD) 46
+1 Thoughtcast (MRD) 54
+1 Merchant Scroll (8ED) 90
+1 Mystical Tutor (6ED) 85
+1 Vampiric Tutor (6ED) 152
+1 Enlightened Tutor (JUD) 12
+1 Worldly Tutor (9ED) 283
+1 Green Sun's Zenith (MBS) 81
+1 Chord of Calling (M11) 165
+1 Collected Company (DTK) 215
+1 Finale of Devastation (WAR) 160
+1 Craterhoof Behemoth (M13) 126
+1 Avenger of Zendikar (WWK) 96
+1 Oracle of Mul Daya (ZNR) 196
+1 Scavenging Ooze (M21) 204
+1 Ramunap Excavator (HOU) 129
+1 Fierce Empath (TMP) 224
+1 Fauna Shaman (MMA) 143
+1 Reclamation Sage (DOM) 178
+1 Acidic Slime (M11) 164
+1 Terastodon (WWK) 116
+1 Woodfall Primus (SHM) 135
+1 Manglehorn (AKH) 170
+1 Beast Within (NPH) 103
+1 Krosan Grip (TSP) 202
+1 Abrupt Decay (RTR) 148
+1 Assassin's Trophy (GRN) 152
+1 Maelstrom Pulse (ARB) 92
+1 Toxic Deluge (C13) 96
+1 Wrath of God (CM2) 27
+1 Day of Judgment (M12) 11
+1 Cleansing Nova (M19) 9
+1 Fumigate (KLD) 14
+1 Hour of Revelation (HOU) 15
+1 Hour of Devastation (HOU) 106
+1 Planar Cleansing (M10) 23
+1 Armageddon (6ED) 3
+1 Ravages of War (PTK) 17
+1 Jokulhaups (ICE) 196
+1 Life from the Loam (RAV) 172
+1 Crucible of Worlds (5DN) 114
+1 Exploration (USG) 250
+1 Burgeoning (6ED) 226
+1 Sylvan Library (6ED) 259
+1 Mystic Retrieval (DKA) 42
+1 Elesh Norn, Grand Cenobite (PMEI) 10
+1 Serra's Sanctum (USG) 324
+1 Nykthos, Shrine to Nyx (THS) 223
+1 Castle Garenbrig (ELD) 240
+1 Wasteland (EXP) 45
+1 Strip Mine (EXP) 46
+1 Misty Rainforest (MH2) 249
+1 Verdant Catacombs (MH2) 260
+1 Windswept Heath (KTK) 248
+1 Wooded Foothills (KTK) 249
+1 Scalding Tarn (MH2) 254
+1 Arid Mesa (MH2) 244
+1 Marsh Flats (MH2) 248
+1 Bloodstained Mire (KTK) 230
+1 Polluted Delta (KTK) 242
+1 Flooded Strand (KTK) 243
+1 Prismatic Vista (MH1) 244
+1 Savannah (3ED) 237
+1 Plateau (3ED) 221
+1 Scrubland (3ED) 239
+1 Bayou (3ED) 229
+1 Taiga (3ED) 242
+1 Badlands (3ED) 227
+1 Volcanic Island (3ED) 284
+1 Tundra (3ED) 282
+1 Underground Sea (3ED) 280
+1 Tropical Island (3ED) 284
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Forest (JMP) 43
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Island (JMP) 41
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Plains (JMP) 42
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Swamp (JMP) 40
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
+1 Mountain (JMP) 39
