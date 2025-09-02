@@ -23,3 +23,7 @@ Thumbs.db
 
 # Analysis output files (optional - user can uncomment if they don't want to track these)
 # *_analysis.txt
+
+
+#Ignore vscode AI rules
+.github/copilot-instructions.md
