@@ -1,10 +1,11 @@
-# Python cache files
+commared# Python cache files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 *.so
+
 
 # Virtual environments
 venv/
@@ -25,5 +26,5 @@ Thumbs.db
 # *_analysis.txt
 
 
-#Ignore vscode AI rules
-.github/copilot-instructions.md
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

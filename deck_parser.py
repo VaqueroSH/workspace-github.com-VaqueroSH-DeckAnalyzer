@@ -57,6 +57,7 @@ class DeckParser:
         cards = {}
         card_sets = {}
         commander = None
+        first_card = None  # Track the first card parsed (likely the commander)
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -85,11 +86,9 @@ class DeckParser:
             else:
                 quantity, card_name = parsed
             
-            # Handle potential commander identification
-            # (This is heuristic-based, could be improved with better format detection)
-            if quantity == 1 and len(cards) == 0:
-                # First single card might be commander - we'll determine this later
-                pass
+            # Track first card (often the commander in Commander decks)
+            if first_card is None and quantity == 1:
+                first_card = card_name
             
             # Add to deck
             if card_name in cards:
@@ -101,7 +100,7 @@ class DeckParser:
             raise ValueError(f"No valid cards found in {file_path}")
         
         # Try to identify commander (simple heuristic: legendary creature with quantity 1)
-        commander = self._identify_commander(cards, card_sets)
+        commander = self._identify_commander(cards, card_sets, first_card)
         
         # Create and return the Deck object with the parsed information
         return Deck(
@@ -111,18 +110,30 @@ class DeckParser:
             name=deck_name  # Include the deck name
         )
     
-    def _identify_commander(self, cards: Dict[str, int], card_sets: Dict[str, str]) -> Optional[str]:
+    def _identify_commander(self, cards: Dict[str, int], card_sets: Dict[str, str], first_card: Optional[str] = None) -> Optional[str]:
         """
         Identify the commander from a deck using various heuristics.
 
         Args:
             cards: Dictionary of card names to quantities
             card_sets: Dictionary of card names to set codes
+            first_card: The first card parsed from the list (often the commander)
 
         Returns:
             Commander card name if identified, None otherwise
         """
-        # Look for cards with quantity 1 that might be commanders
+        # Priority 1: If the first card has quantity 1 and looks like a commander, use it
+        if first_card and cards.get(first_card) == 1:
+            card_lower = first_card.lower()
+            # Check if first card name suggests it's a legendary/commander
+            commander_indicators = [
+                'legendary', 'commander', 'the ', 'lord', 'queen', 'king',
+                'master', 'captain', 'general', 'overseer'
+            ]
+            if any(indicator in card_lower for indicator in commander_indicators):
+                return first_card
+        
+        # Priority 2: Look for cards with quantity 1 that might be commanders
         potential_commanders = []
         for card_name, quantity in cards.items():
             if quantity == 1:  # Commanders are typically single cards
