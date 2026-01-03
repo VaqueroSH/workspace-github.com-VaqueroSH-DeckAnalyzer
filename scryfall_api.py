@@ -34,6 +34,7 @@ class CardInfo:
     produced_mana: Set[str] = field(default_factory=set)
     power: Optional[int] = None
     toughness: Optional[int] = None
+    mana_cost: str = ""
     
     @property
     def color_identity(self) -> Set[str]:
@@ -369,6 +370,9 @@ class ScryfallAPI:
             except (ValueError, TypeError):
                 pass
         
+        # Parse mana cost (e.g., "{2}{U}{U}")
+        mana_cost = data.get('mana_cost', '')
+        
         return CardInfo(
             name=name,
             colors=colors,
@@ -382,7 +386,8 @@ class ScryfallAPI:
             legalities=legalities,
             produced_mana=produced_mana,
             power=power,
-            toughness=toughness
+            toughness=toughness,
+            mana_cost=mana_cost
         )
     
     def get_cards_batch(
