@@ -9,6 +9,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import Optional, Dict, List, Any, Set
 import traceback
+import tempfile
+import os
 
 # Import all V2 modules
 from bracket import evaluate_bracket, BracketResult
@@ -818,7 +820,17 @@ def main():
     
     with st.spinner("🔄 Parsing decklist..."):
         try:
-            deck = parse_decklist(decklist_input)
+            # Write decklist to temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(decklist_input)
+                temp_file_path = temp_file.name
+            
+            # Parse the file
+            deck = parse_decklist(temp_file_path)
+            
+            # Clean up temp file
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
             
             if not deck or not deck.cards:
                 st.error("❌ Could not parse decklist. Please check format.")
