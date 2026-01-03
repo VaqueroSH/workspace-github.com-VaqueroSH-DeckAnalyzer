@@ -76,7 +76,7 @@
     "restricted_cards": [],
     "deck_construction": {
       "min_deck_size": 100,
-      "max_deck_size": null,
+      "max_deck_size": 100,
       "max_sideboard": 15,
       "commander_required": true,
       "commander_count": 1,

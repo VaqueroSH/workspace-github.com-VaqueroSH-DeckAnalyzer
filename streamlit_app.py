@@ -1,52 +1,52 @@
 #!/usr/bin/env python3
 """
-Streamlit MTG Deck Analyzer - Enhanced Visual Design
+MTG Deck Analyzer V2 - Complete Analysis Suite
+Full integration of all V2 modules with working analysis pipeline
 """
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
-import tempfile
-import os
+from typing import Optional, Dict, List, Any, Set
+import traceback
 
-from scryfall_api import ScryfallAPI
-from deck_parser import parse_decklist
-from models import DeckAnalyzer
-from format_checker import FormatChecker
-
-# V2 Analysis Modules
+# Import all V2 modules
 from bracket import evaluate_bracket, BracketResult
 from consistency import calculate_consistency, ConsistencyResult
 from curve_eval import evaluate_curve, Card as CurveCard, EvalContext
 from roles import assign_roles, summarize_roles, Deck as RoleDeck, Card as RoleCard, Role
-from synergy import evaluate_synergy, generate_synergy_summary
+from synergy import evaluate_synergy
 from deck_warnings import (
     WarningContext, evaluate_warnings, detect_problematic_cards, 
     Severity, generate_warnings_summary
 )
 from tagger import tag_many, filter_by_tag, count_tag
 
+# Import existing modules
+from scryfall_api import ScryfallAPI
+from deck_parser import parse_decklist
+from models import Card
+
+# Initialize API
+api = ScryfallAPI()
+
 # Page configuration
 st.set_page_config(
-    page_title="🃏 MTG Deck Analyzer",
+    page_title="🃏 MTG Deck Analyzer V2",
     page_icon="🃏",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced CSS with better visual design
+# ===== ENHANCED CSS =====
 st.markdown("""
 <style>
-    /* Import modern font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap');
     
-    /* Base styling */
     * {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* Main container with animated gradient */
     .main {
         background: linear-gradient(135deg, #0a0a1e 0%, #1a1a3e 25%, #2a1a3e 50%, #1a1a3e 75%, #0a0a1e 100%);
         background-size: 400% 400%;
@@ -59,7 +59,6 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
     
-    /* Glassmorphism cards */
     .glass-card {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(20px);
@@ -67,1154 +66,851 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         padding: 1.5rem;
+        margin: 1rem 0;
         transition: all 0.3s ease;
     }
     
     .glass-card:hover {
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(102, 126, 234, 0.3);
-        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+        box-shadow: 0 12px 48px rgba(102, 126, 234, 0.2);
         transform: translateY(-2px);
     }
     
-    /* Enhanced metrics */
     [data-testid="stMetricValue"] {
-        font-size: 2.2rem;
-        font-weight: 800;
+        font-size: 2.5rem;
+        font-weight: 900;
         background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        letter-spacing: -0.5px;
+        letter-spacing: -1px;
     }
     
     [data-testid="stMetricLabel"] {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         font-weight: 600;
         color: rgba(255, 255, 255, 0.7);
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
     }
     
-    [data-testid="stMetricDelta"] {
-        font-size: 0.85rem;
-        font-weight: 600;
+    h1 {
+        font-size: 4rem !important;
+        font-weight: 900 !important;
+        background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 2rem !important;
+        letter-spacing: -2px;
     }
     
-    /* Section headers with gradient underline */
-    h1, h2, h3 {
+    h2 {
+        font-size: 2rem !important;
+        font-weight: 800 !important;
         color: #ffffff;
-        font-weight: 800;
-        letter-spacing: -0.5px;
+        margin-top: 2rem !important;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid rgba(102, 126, 234, 0.3);
     }
     
     h3 {
-        position: relative;
-        padding-bottom: 1rem;
-        margin-top: 3rem;
-        margin-bottom: 1.5rem;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: rgba(255, 255, 255, 0.9);
+        margin-top: 1.5rem !important;
     }
     
-    h3::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 80px;
-        height: 4px;
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        border-radius: 2px;
-    }
-    
-    /* Enhanced buttons */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
         border-radius: 12px;
-        padding: 0.85rem 2.5rem;
+        padding: 0.75rem 2rem;
         font-weight: 700;
         font-size: 1rem;
         letter-spacing: 0.5px;
         transition: all 0.3s ease;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .stButton > button::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-        transition: left 0.5s;
-    }
-    
-    .stButton > button:hover::before {
-        left: 100%;
     }
     
     .stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
     }
     
-    /* Text input and text area with glow effect */
-    .stTextArea > div > div > textarea,
-    .stTextInput > div > div > input {
+    .streamlit-expanderHeader {
         background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(10px);
-        border: 2px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .stTextArea textarea {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         color: white;
-        font-family: 'Monaco', monospace;
-        padding: 1rem;
-        transition: all 0.3s ease;
+        font-family: 'JetBrains Mono', monospace;
     }
     
-    .stTextArea > div > div > textarea:focus,
-    .stTextInput > div > div > input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
-        background: rgba(255, 255, 255, 0.05);
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
     }
     
-    /* Enhanced dataframes */
-    .stDataFrame {
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 12px;
-        border: 1px solid rgba(102, 126, 234, 0.2);
-        overflow: hidden;
-    }
-    
-    /* Expander with better styling */
-    .streamlit-expanderHeader {
-        background: rgba(102, 126, 234, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        border: 1px solid rgba(102, 126, 234, 0.2);
-        font-weight: 600;
-        padding: 1rem;
-        transition: all 0.3s ease;
-    }
-    
-    .streamlit-expanderHeader:hover {
-        background: rgba(102, 126, 234, 0.15);
-        border-color: rgba(102, 126, 234, 0.4);
-    }
-    
-    /* Enhanced alert boxes */
-    .stSuccess {
-        background: rgba(34, 197, 94, 0.1);
-        border-left: 4px solid #22c55e;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        backdrop-filter: blur(10px);
-    }
-    
-    .stError {
-        background: rgba(239, 68, 68, 0.1);
-        border-left: 4px solid #ef4444;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        backdrop-filter: blur(10px);
-    }
-    
-    .stWarning {
-        background: rgba(251, 191, 36, 0.1);
-        border-left: 4px solid #fbbf24;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        backdrop-filter: blur(10px);
-    }
-    
-    .stInfo {
-        background: rgba(59, 130, 246, 0.1);
-        border-left: 4px solid #3b82f6;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        backdrop-filter: blur(10px);
-    }
-    
-    /* Spinner with custom color */
-    .stSpinner > div {
-        border-color: #667eea transparent transparent !important;
-    }
-    
-    /* Chart containers */
-    .js-plotly-plot {
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(10px);
-        padding: 1rem;
-        border: 1px solid rgba(102, 126, 234, 0.1);
-    }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a3e 0%, #0a0a1e 100%);
-        border-right: 1px solid rgba(102, 126, 234, 0.2);
-    }
-    
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: rgba(255, 255, 255, 0.9);
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    
-    /* Custom dividers */
-    hr {
-        border: none;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.5), transparent);
-        margin: 2.5rem 0;
-    }
-    
-    /* Feature badge animation */
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-5px); }
-    }
-    
-    .feature-badge {
-        animation: float 3s ease-in-out infinite;
-    }
-    
-    /* Stat card with gradient border */
-    .stat-card {
-        background: rgba(255, 255, 255, 0.02);
-        border: 2px solid transparent;
-        border-radius: 16px;
-        padding: 1.5rem;
-        background-clip: padding-box;
-        position: relative;
-        transition: all 0.3s ease;
-    }
-    
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        inset: -2px;
-        border-radius: 16px;
-        padding: 2px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
-    .stat-card:hover::before {
-        opacity: 1;
-    }
-    
-    /* File uploader styling */
-    [data-testid="stFileUploader"] {
-        background: rgba(255, 255, 255, 0.02);
-        border: 2px dashed rgba(102, 126, 234, 0.3);
-        border-radius: 12px;
-        padding: 1rem;
-        transition: all 0.3s ease;
-    }
-    
-    [data-testid="stFileUploader"]:hover {
-        border-color: #667eea;
-        background: rgba(102, 126, 234, 0.05);
-    }
-    
-    /* Select box styling */
-    .stSelectbox > div > div {
+    .stTabs [data-baseweb="tab"] {
         background: rgba(255, 255, 255, 0.03);
-        border: 2px solid rgba(102, 126, 234, 0.2);
         border-radius: 12px;
-        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
     }
     
-    .stSelectbox > div > div:hover {
-        border-color: #667eea;
-        box-shadow: 0 0 15px rgba(102, 126, 234, 0.2);
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: transparent;
     }
     
-    /* Checkbox styling */
-    .stCheckbox {
-        color: rgba(255, 255, 255, 0.9);
-    }
-    
-    /* Progress bars */
-    .stProgress > div > div > div {
-        background: linear-gradient(90deg, #667eea, #764ba2);
+    .stProgress > div > div > div > div {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = 'landing'
-if 'deck_data' not in st.session_state:
-    st.session_state.deck_data = None
-if 'analysis_results' not in st.session_state:
-    st.session_state.analysis_results = None
+# ===== HELPER FUNCTIONS =====
 
-# Navigation callback functions
-def go_to_analysis():
-    st.session_state.current_page = 'analysis'
+def severity_to_emoji(severity: Severity) -> str:
+    """Map severity to emoji"""
+    if severity == Severity.CRITICAL:
+        return "🔴"
+    elif severity == Severity.HIGH:
+        return "🟠"
+    elif severity == Severity.WARN:
+        return "🟡"
+    else:
+        return "🔵"
 
-def go_to_landing():
-    st.session_state.current_page = 'landing'
-    st.session_state.deck_data = None
-    st.session_state.analysis_results = None
-
-# Helper function to create styled metric cards
-def create_metric_card(label, value, delta=None, icon="📊"):
-    """Create a beautifully styled metric card"""
-    delta_html = ""
-    if delta:
-        delta_color = "#22c55e" if delta > 0 else "#ef4444"
-        delta_html = f"""
-        <div style="
-            color: {delta_color};
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        ">
-            {"↑" if delta > 0 else "↓"} {abs(delta)}%
-        </div>
-        """
+def create_bar_chart(x: List[str], y: List[float], title: str, color: str = '#667eea'):
+    """Create a styled bar chart"""
+    fig = go.Figure(data=[go.Bar(
+        x=x,
+        y=y,
+        marker=dict(
+            color=color,
+            line=dict(color='rgba(255,255,255,0.2)', width=1)
+        ),
+        text=[f"{val:.0f}" if val > 0 else "" for val in y],
+        textposition='outside',
+        textfont=dict(size=14, color='white', family='Inter')
+    )])
     
-    return f"""
-    <div class="stat-card" style="text-align: center; height: 100%;">
-        <div style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</div>
-        <div style="
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-        ">{label}</div>
-        <div style="
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        ">{value}</div>
-        {delta_html}
-    </div>
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=20, color='white', family='Inter')),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', family='Inter'),
+        xaxis=dict(gridcolor='rgba(255,255,255,0.1)', title_font=dict(size=14)),
+        yaxis=dict(gridcolor='rgba(255,255,255,0.1)', title_font=dict(size=14)),
+        height=400,
+        margin=dict(t=60, b=60, l=60, r=20)
+    )
+    
+    return fig
+
+def create_donut_chart(values: List[float], labels: List[str], title: str, colors: Optional[List[str]] = None):
+    """Create a styled donut chart"""
+    if colors is None:
+        colors = ['#667eea', '#a78bfa', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']
+    
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.4,
+        marker=dict(colors=colors, line=dict(color='rgba(255,255,255,0.2)', width=2)),
+        textfont=dict(size=14, color='white', family='Inter'),
+        hovertemplate='<b>%{label}</b><br>%{value}<br>%{percent}<extra></extra>'
+    )])
+    
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=20, color='white', family='Inter'), x=0.5, xanchor='center'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', family='Inter'),
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.2,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12)
+        ),
+        height=400,
+        margin=dict(t=60, b=60, l=20, r=20)
+    )
+    
+    return fig
+
+# ===== ANALYSIS PIPELINE =====
+
+def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dict[str, Any]:
     """
-
-# Page routing
-if st.session_state.current_page == 'landing':
-    # ===== ENHANCED LANDING PAGE =====
+    Run complete V2 analysis pipeline on deck.
+    Returns dict with all analysis results.
+    """
     
-    # Animated hero section
-    st.markdown("""
-    <div style="
-        text-align: center; 
-        padding: 5rem 2rem 4rem 2rem; 
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-        border-radius: 24px; 
-        margin-bottom: 3rem; 
-        border: 2px solid rgba(102, 126, 234, 0.2);
-        box-shadow: 0 25px 80px rgba(102, 126, 234, 0.15);
-        backdrop-filter: blur(20px);
-        position: relative;
-        overflow: hidden;
-    ">
-        <div style="
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
-            animation: pulse 4s ease-in-out infinite;
-        "></div>
-        <div style="position: relative; z-index: 1;">
-            <h1 style="
-                font-size: 4rem; 
-                margin-bottom: 1.5rem;
-                background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                font-weight: 900;
-                letter-spacing: -2px;
-                line-height: 1.1;
-            ">🃏 MTG Deck Analyzer</h1>
-            <p style="
-                font-size: 1.4rem; 
-                margin-bottom: 3rem; 
-                color: rgba(255, 255, 255, 0.85);
-                font-weight: 400;
-                max-width: 700px;
-                margin-left: auto;
-                margin-right: auto;
-                line-height: 1.6;
-            ">
-                Professional deck analysis powered by Scryfall<br/>
-                <span style="color: rgba(255, 255, 255, 0.6); font-size: 1.1rem;">
-                    Get instant insights on your Magic: The Gathering decks
-                </span>
-            </p>
-            <div style="
-                display: flex; 
-                justify-content: center; 
-                gap: 1.5rem; 
-                flex-wrap: wrap; 
-                max-width: 1000px; 
-                margin: 0 auto;
-            ">
-                <div class="feature-badge" style="
-                    background: rgba(102, 126, 234, 0.12);
-                    backdrop-filter: blur(10px);
-                    padding: 1rem 2rem;
-                    border-radius: 30px;
-                    font-weight: 700;
-                    border: 2px solid rgba(102, 126, 234, 0.3);
-                    color: #b8c5ff;
-                    font-size: 1.05rem;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-                    animation-delay: 0s;
-                ">📊 Advanced Analytics</div>
-                <div class="feature-badge" style="
-                    background: rgba(102, 126, 234, 0.12);
-                    backdrop-filter: blur(10px);
-                    padding: 1rem 2rem;
-                    border-radius: 30px;
-                    font-weight: 700;
-                    border: 2px solid rgba(102, 126, 234, 0.3);
-                    color: #b8c5ff;
-                    font-size: 1.05rem;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-                    animation-delay: 0.2s;
-                ">💰 Price Tracking</div>
-                <div class="feature-badge" style="
-                    background: rgba(102, 126, 234, 0.12);
-                    backdrop-filter: blur(10px);
-                    padding: 1rem 2rem;
-                    border-radius: 30px;
-                    font-weight: 700;
-                    border: 2px solid rgba(102, 126, 234, 0.3);
-                    color: #b8c5ff;
-                    font-size: 1.05rem;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-                    animation-delay: 0.4s;
-                ">⚖️ Format Legality</div>
-                <div class="feature-badge" style="
-                    background: rgba(102, 126, 234, 0.12);
-                    backdrop-filter: blur(10px);
-                    padding: 1rem 2rem;
-                    border-radius: 30px;
-                    font-weight: 700;
-                    border: 2px solid rgba(102, 126, 234, 0.3);
-                    color: #b8c5ff;
-                    font-size: 1.05rem;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-                    animation-delay: 0.6s;
-                ">🎯 Interaction Analysis</div>
-            </div>
-        </div>
-    </div>
-    
-    <style>
-    @keyframes pulse {
-        0%, 100% { opacity: 0.5; transform: scale(1); }
-        50% { opacity: 0.8; transform: scale(1.05); }
+    results = {
+        'success': False,
+        'error': None,
+        'bracket': None,
+        'consistency': None,
+        'curve': None,
+        'roles': None,
+        'synergy': None,
+        'warnings': None,
+        'tags': None,
+        'card_data': []
     }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Main upload section with enhanced design
-    st.markdown("## 🚀 Quick Start")
-    st.markdown("")
-
-    col1, col2 = st.columns([3, 2], gap="large")
-
-    with col1:
-        st.markdown("""
-        <div class="glass-card">
-            <h3 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.5rem;">
-                📝 Paste Your Decklist
-            </h3>
-        """, unsafe_allow_html=True)
+    
+    try:
+        # Step 1: Fetch Scryfall data for all cards
+        st.write("📥 Fetching card data from Scryfall...")
+        progress_bar = st.progress(0)
         
-        # Optional deck name input
-        deck_name_input = st.text_input(
-            "Deck Name (Optional)",
-            placeholder="e.g., Sephiroth Aristocrats",
-            help="Give your deck a custom name, or leave blank to use the commander's name"
+        card_data = []
+        total_cards = len(deck.cards)
+        
+        for i, card in enumerate(deck.cards):
+            try:
+                card_info = api.get_card(card.name)
+                if card_info:
+                    card_data.append({
+                        'name': card_info.name,
+                        'type_line': card_info.type_line,
+                        'oracle_text': card_info.oracle_text or '',
+                        'cmc': card_info.mana_value,
+                        'colors': list(card_info.colors) if card_info.colors else [],
+                        'color_identity': list(card_info.color_identity) if card_info.color_identity else [],
+                        'keywords': list(card_info.keywords) if card_info.keywords else [],
+                        'mana_cost': card_info.mana_cost or '',
+                        'quantity': 1
+                    })
+                progress_bar.progress((i + 1) / total_cards)
+            except Exception as e:
+                st.warning(f"⚠️ Could not fetch {card.name}: {str(e)}")
+        
+        results['card_data'] = card_data
+        
+        if not card_data:
+            results['error'] = "No valid cards found in decklist"
+            return results
+        
+        # Step 2: Tag all cards
+        st.write("🏷️ Tagging cards...")
+        card_tags = tag_many(card_data)
+        results['tags'] = card_tags
+        
+        # Step 3: Bracket Analysis
+        st.write("📊 Evaluating bracket...")
+        bracket_result = evaluate_bracket(card_data)
+        results['bracket'] = bracket_result
+        
+        # Step 4: Role Classification
+        st.write("🎭 Classifying card roles...")
+        role_deck = RoleDeck(
+            cards=[
+                RoleCard(
+                    name=c['name'],
+                    cmc=c['cmc'],
+                    type_line=c['type_line'],
+                    oracle_text=c['oracle_text'],
+                    keywords=set(c['keywords']),
+                    colors=set(c['colors']),
+                    mana_cost=c.get('mana_cost', '')
+                )
+                for c in card_data
+            ]
+        )
+        card_roles = assign_roles(role_deck)
+        role_summary = summarize_roles(card_roles)
+        results['roles'] = role_summary
+        results['card_roles'] = card_roles
+        
+        # Step 5: Curve Evaluation
+        st.write("📈 Analyzing mana curve...")
+        curve_cards = [
+            CurveCard(
+                name=c['name'],
+                mv=c['cmc'],
+                oracle_text=c['oracle_text'],
+                type_line=c['type_line'],
+                qty=c['quantity']
+            )
+            for c in card_data
+        ]
+        
+        # Determine commander CMC if provided
+        commander_cmc = 0
+        if commander_name:
+            for c in card_data:
+                if c['name'].lower() == commander_name.lower():
+                    commander_cmc = c['cmc']
+                    break
+        
+        curve_context = EvalContext(
+            commander_cmc=commander_cmc,
+            commander_centric_count=0
+        )
+        curve_result = evaluate_curve(curve_cards, curve_context)
+        results['curve'] = curve_result
+        
+        # Step 6: Consistency Scoring
+        st.write("🎯 Calculating consistency...")
+        
+        # Build role distribution for consistency
+        role_dist = {}
+        for role in Role:
+            count = role_summary.role_counts.get(role, 0)
+            if count > 0:
+                role_dist[role.name] = count
+        
+        # Calculate average CMC
+        nonland_cards = [c for c in card_data if 'Land' not in c['type_line']]
+        avg_cmc = sum(c['cmc'] for c in nonland_cards) / len(nonland_cards) if nonland_cards else 0
+        
+        land_count = sum(1 for c in card_data if 'Land' in c['type_line'])
+        
+        consistency_result = calculate_consistency(
+            deck_cards=card_data,
+            role_distribution=role_dist,
+            avg_cmc=avg_cmc,
+            land_count=land_count
+        )
+        results['consistency'] = consistency_result
+        
+        # Step 7: Synergy Detection
+        st.write("🔮 Detecting synergies...")
+        counts = {c['name']: c['quantity'] for c in card_data}
+        
+        # Get commander if provided
+        commander_card = None
+        if commander_name:
+            for c in card_data:
+                if c['name'].lower() == commander_name.lower():
+                    commander_card = c
+                    break
+        
+        synergy_result = evaluate_synergy(card_data, counts, commander=commander_card)
+        results['synergy'] = synergy_result
+        
+        # Step 8: Generate Warnings
+        st.write("⚠️ Checking for warnings...")
+        
+        warning_ctx = WarningContext(
+            bracket_target=bracket_target,
+            deck_size=len(card_data),
+            commanders=[commander_name] if commander_name else [],
+            land_count=role_summary.role_counts.get(Role.LAND, 0),
+            ramp_count=role_summary.role_counts.get(Role.RAMP, 0),
+            interaction_count=role_summary.role_counts.get(Role.INTERACTION, 0),
+            removal_count=role_summary.role_counts.get(Role.REMOVAL, 0),
+            boardwipe_count=role_summary.role_counts.get(Role.BOARD_WIPE, 0),
+            counterspell_count=role_summary.role_counts.get(Role.COUNTERSPELL, 0),
+            tutor_count=role_summary.role_counts.get(Role.TUTOR, 0),
+            draw_count=role_summary.role_counts.get(Role.CARD_DRAW, 0),
+            protection_count=role_summary.role_counts.get(Role.PROTECTION, 0),
+            game_changers=bracket_result.game_changers_found,
+            fast_mana=filter_by_tag(card_tags, 'fast_mana'),
+            extra_turns=filter_by_tag(card_tags, 'extra_turns'),
+            mld=filter_by_tag(card_tags, 'mld'),
+            stax_pieces=filter_by_tag(card_tags, 'stax'),
+            avg_cmc=avg_cmc,
+            tapland_count=count_tag(card_tags, 'tapland') if 'tapland' in str(card_tags) else 0,
+            curve_report=curve_result,
+            consistency_result=consistency_result,
+            synergy_report=synergy_result,
+            roles_summary=role_summary
         )
         
-        decklist_text = st.text_area(
+        warnings_result = evaluate_warnings(warning_ctx)
+        results['warnings'] = warnings_result
+        
+        results['success'] = True
+        st.success("✅ Analysis complete!")
+        
+    except Exception as e:
+        results['error'] = str(e)
+        results['traceback'] = traceback.format_exc()
+        st.error(f"❌ Analysis failed: {str(e)}")
+    
+    return results
+
+# ===== DISPLAY FUNCTIONS =====
+
+def display_warnings(warnings_report):
+    """Display warnings tab"""
+    st.markdown("### ⚠️ Warnings & Issues")
+    
+    if not warnings_report or not warnings_report.items:
+        st.success("✅ No warnings detected - deck looks clean!")
+        return
+    
+    # Summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    by_severity = warnings_report.by_severity()
+    
+    with col1:
+        critical = len(by_severity.get(Severity.CRITICAL, []))
+        st.metric("🔴 Critical", critical)
+    with col2:
+        high = len(by_severity.get(Severity.HIGH, []))
+        st.metric("🟠 High", high)
+    with col3:
+        warn = len(by_severity.get(Severity.WARN, []))
+        st.metric("🟡 Warnings", warn)
+    with col4:
+        info = len(by_severity.get(Severity.INFO, []))
+        st.metric("🔵 Info", info)
+    
+    st.markdown("---")
+    
+    # Display warnings by severity
+    for severity in [Severity.CRITICAL, Severity.HIGH, Severity.WARN, Severity.INFO]:
+        warnings_list = by_severity.get(severity, [])
+        if not warnings_list:
+            continue
+        
+        emoji = severity_to_emoji(severity)
+        expanded = severity in [Severity.CRITICAL, Severity.HIGH]
+        
+        with st.expander(f"{emoji} {severity.value.upper()} ({len(warnings_list)})", expanded=expanded):
+            for warning in warnings_list:
+                st.markdown(f"**{warning.title}**")
+                st.write(warning.detail)
+                
+                if warning.evidence:
+                    with st.expander("📋 Evidence", expanded=False):
+                        for evidence in warning.evidence[:10]:
+                            st.write(f"• {evidence}")
+                        if len(warning.evidence) > 10:
+                            st.write(f"... and {len(warning.evidence) - 10} more")
+                
+                if warning.suggestion:
+                    st.info(f"💡 **Suggestion:** {warning.suggestion}")
+                
+                st.markdown("---")
+
+def display_bracket_analysis(bracket_result: BracketResult, card_tags):
+    """Display bracket analysis tab"""
+    st.markdown("### 📊 Bracket Classification")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Bracket display
+        bracket_emoji = "🟢" if bracket_result.minimum_bracket in ["B1", "B2"] else "🟡" if bracket_result.minimum_bracket == "B3" else "🔴"
+        
+        st.markdown(f"""
+        <div class='glass-card' style='text-align: center;'>
+            <h2 style='font-size: 5rem; margin: 2rem 0;'>{bracket_emoji} {bracket_result.minimum_bracket}</h2>
+            <p style='font-size: 1.5rem; color: rgba(255,255,255,0.7); margin-bottom: 2rem;'>
+                Minimum Bracket
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"**Game Changers Found:** {bracket_result.game_changer_count}")
+        
+        if bracket_result.game_changers_found:
+            st.markdown("**Game Changer Cards:**")
+            for gc in bracket_result.game_changers_found:
+                st.write(f"• {gc}")
+        
+        if bracket_result.is_cedh:
+            st.warning("🏆 **cEDH Detected:** This deck contains cEDH signpost cards")
+    
+    with col2:
+        st.markdown("**Power Level Indicators**")
+        
+        fast_mana_count = count_tag(card_tags, 'fast_mana')
+        st.metric("⚡ Fast Mana", fast_mana_count)
+        
+        tutor_count = count_tag(card_tags, 'tutor:library_search')
+        st.metric("🔍 Tutors", tutor_count)
+        
+        interaction_count = count_tag(card_tags, 'interaction:counterspell')
+        st.metric("🛡️ Free Interaction", interaction_count)
+
+def display_consistency_analysis(consistency_result: ConsistencyResult):
+    """Display consistency analysis tab"""
+    st.markdown("### 🎯 Consistency Analysis")
+    
+    # Overall score
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        score_color = "#22c55e" if consistency_result.score >= 70 else "#fbbf24" if consistency_result.score >= 50 else "#ef4444"
+        st.markdown(f"""
+        <div class='glass-card' style='text-align: center;'>
+            <h2 style='font-size: 5rem; margin: 2rem 0; color: {score_color};'>{consistency_result.score:.0f}</h2>
+            <p style='font-size: 1.5rem; color: rgba(255,255,255,0.7);'>Consistency Score</p>
+            <p style='font-size: 1.2rem; color: rgba(255,255,255,0.5); margin-top: 1rem;'>{consistency_result.level}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        # Component breakdown
+        st.markdown("**Component Breakdown**")
+        
+        components = [
+            ("Card Access", consistency_result.metrics.access_score, 30),
+            ("Redundancy", consistency_result.metrics.redundancy_score, 25),
+            ("Mana Base", consistency_result.metrics.mana_score, 25),
+            ("Speed", consistency_result.metrics.speed_score, 15)
+        ]
+        
+        for name, score, max_score in components:
+            pct = (score / max_score) * 100 if max_score > 0 else 0
+            st.progress(min(pct / 100, 1.0), text=f"{name}: {score:.1f}/{max_score}")
+    
+    # Strengths and weaknesses
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        st.markdown("**✅ Strengths**")
+        for strength in consistency_result.strengths:
+            st.success(strength)
+        
+        if not consistency_result.strengths:
+            st.info("No major strengths identified")
+    
+    with col4:
+        st.markdown("**❌ Weaknesses**")
+        for weakness in consistency_result.weaknesses:
+            st.error(weakness)
+        
+        if not consistency_result.weaknesses:
+            st.success("No major weaknesses identified")
+
+def display_curve_analysis(curve_result):
+    """Display curve analysis tab"""
+    st.markdown("### 📈 Mana Curve Analysis")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.metric("Curve Score", f"{curve_result.curve_score:.0f}/100", delta=curve_result.level)
+        st.metric("Average MV", f"{curve_result.avg_mv:.2f}")
+        st.metric("Effective Mana", f"{curve_result.effective_mana_sources:.0f}")
+        
+        if hasattr(curve_result, 'shape_category'):
+            st.metric("Curve Shape", curve_result.shape_category)
+    
+    with col2:
+        # Mana curve distribution
+        if hasattr(curve_result, 'mv_distribution') and curve_result.mv_distribution:
+            mv_labels = [f"MV {mv}" for mv in sorted(curve_result.mv_distribution.keys())]
+            mv_values = [curve_result.mv_distribution[mv] for mv in sorted(curve_result.mv_distribution.keys())]
+            
+            fig = create_bar_chart(mv_labels, mv_values, "Mana Value Distribution", '#667eea')
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Warnings
+    if hasattr(curve_result, 'warnings') and curve_result.warnings:
+        st.markdown("**⚠️ Curve Warnings**")
+        for warning in curve_result.warnings:
+            st.warning(warning)
+
+def display_roles_and_synergy(role_summary, synergy_result, card_roles):
+    """Display roles and synergy tab"""
+    st.markdown("### 🎭 Roles & Synergy")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Role Distribution**")
+        
+        # Get top roles
+        role_counts = [(role.name, count) for role, count in role_summary.role_counts.items() if count > 0]
+        role_counts.sort(key=lambda x: -x[1])
+        
+        if role_counts:
+            # Create pie chart
+            labels = [r[0] for r in role_counts[:8]]
+            values = [r[1] for r in role_counts[:8]]
+            
+            fig = create_donut_chart(values, labels, "Top Roles")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # List all roles
+            with st.expander("📋 All Roles", expanded=False):
+                for role_name, count in role_counts:
+                    st.write(f"**{role_name}:** {count}")
+        else:
+            st.info("No roles detected")
+    
+    with col2:
+        if synergy_result and synergy_result.primary_packages:
+            st.markdown("**Primary Strategies**")
+            
+            for pkg in synergy_result.primary_packages[:3]:
+                with st.expander(f"🎯 {pkg.name.title()} ({pkg.score:.0f}/100)", expanded=True):
+                    st.write(f"**Total Signals:** {pkg.total_signals:.1f}")
+                    
+                    st.markdown("**Components:**")
+                    for comp in pkg.components:
+                        coverage_pct = comp.coverage_ratio * 100
+                        status = "✅" if comp.coverage_ratio >= 0.8 else "⚠️" if comp.coverage_ratio >= 0.5 else "❌"
+                        st.write(f"{status} {comp.name}: {comp.count}/{comp.min_required} ({coverage_pct:.0f}%)")
+                    
+                    if pkg.missing:
+                        st.markdown("**Missing:**")
+                        for miss in pkg.missing[:3]:
+                            st.write(f"• {miss}")
+        else:
+            st.info("No strong synergy packages detected")
+
+def display_card_list(card_data, card_tags, card_roles):
+    """Display complete card list tab"""
+    st.markdown("### 📋 Complete Card List")
+    
+    # Create dataframe
+    card_list = []
+    for card in card_data:
+        name = card['name']
+        roles = card_roles.get(name)
+        tags = card_tags.get(name, set())
+        
+        role_names = ", ".join(r.name for r in roles.roles) if roles else ""
+        tag_list = ", ".join(sorted(tags)[:5]) if tags else ""
+        if len(tags) > 5:
+            tag_list += f" (+{len(tags) - 5} more)"
+        
+        card_list.append({
+            'Name': name,
+            'Type': card['type_line'],
+            'CMC': card['cmc'],
+            'Roles': role_names,
+            'Tags': tag_list
+        })
+    
+    df = pd.DataFrame(card_list)
+    st.dataframe(df, use_container_width=True, height=600)
+    
+    # Export option
+    csv = df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Card List (CSV)",
+        data=csv,
+        file_name="deck_analysis.csv",
+        mime="text/csv"
+    )
+
+# ===== MAIN APP =====
+
+def main():
+    # Hero Section
+    st.markdown("<h1>🃏 MTG Deck Analyzer V2</h1>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='font-size: 1.2rem; color: rgba(255,255,255,0.7); margin-bottom: 2rem;'>
+        Complete deck analysis with bracket classification, consistency scoring, synergy detection, and more.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar for input
+    with st.sidebar:
+        st.markdown("### ⚙️ Configuration")
+        
+        bracket_target = st.selectbox(
+            "Target Bracket",
+            options=["B1", "B2", "B3", "B4", "cEDH"],
+            index=2,
+            help="Select your target power level"
+        )
+        
+        commander_name = st.text_input(
+            "Commander Name (optional)",
+            placeholder="e.g., Atraxa, Praetors' Voice",
+            help="Enter your commander for better analysis"
+        )
+        
+        st.markdown("---")
+        st.markdown("### 📝 Decklist")
+        st.markdown("Paste your decklist (one card per line with quantity)")
+        
+        decklist_input = st.text_area(
             "Decklist",
-            height=250,
-            placeholder="""1 Sephiroth, Fabled SOLDIER // Sephiroth, One-Winged Angel (FIN) 115
-1 Lightning Bolt (M21) 234
-1 Demonic Tutor (STA) 90
-1 Sol Ring (SLD) 2063
-24 Swamp (J25) 89
-24 Mountain (J25) 90""",
-            help="Supports both formats: '1 Card Name' and '1 Card Name (SET) 123'",
+            height=400,
+            placeholder="1 Sol Ring\n1 Command Tower\n1 Rhystic Study\n...",
             label_visibility="collapsed"
         )
-
-        st.markdown("</div>", unsafe_allow_html=True)
         
-        st.markdown("")
-
-        # Example and upload options in styled containers
-        col_a, col_b = st.columns(2)
-        with col_a:
-            if st.button("📋 Load Example Deck", type="secondary", use_container_width=True):
-                decklist_text = """1 Sephiroth, Fabled SOLDIER // Sephiroth, One-Winged Angel (FIN) 115
-1 Lightning Bolt (M21) 234
-1 Demonic Tutor (STA) 90
-1 Sol Ring (SLD) 2063
-24 Swamp (J25) 89
-24 Mountain (J25) 90"""
-                st.rerun()
-
-        with col_b:
-            uploaded_file = st.file_uploader(
-                "📁 Upload File",
-                type=['txt'],
-                help="Upload a decklist file",
-                label_visibility="collapsed"
-            )
-
-        # Handle file upload
-        if uploaded_file is not None:
-            decklist_text = uploaded_file.read().decode('utf-8')
-            st.success(f"✅ Loaded: {uploaded_file.name}")
-
-        st.markdown("")
+        analyze_button = st.button("🔍 Analyze Deck", use_container_width=True)
+    
+    # Main content area
+    if not analyze_button:
+        # Landing page
+        col1, col2, col3 = st.columns(3)
         
-        # Analyze button
-        if st.button("🔍 Analyze Deck", type="primary", disabled=not decklist_text.strip(), use_container_width=True):
-            if decklist_text.strip():
-                st.session_state.deck_data = decklist_text
-                st.session_state.deck_name_custom = deck_name_input if deck_name_input.strip() else None
-                st.session_state.current_page = 'analysis'
-                st.rerun()
-
+        with col1:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>📊 Bracket Analysis</h3>
+                <p>Automatic bracket classification based on Game Changers v1.1 with cEDH detection</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>🎯 Consistency Scoring</h3>
+                <p>Measure deck reliability across 5 components: access, redundancy, mana, speed, and risk</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>📈 Curve Evaluation</h3>
+                <p>Analyze mana curve shape and support with context-aware recommendations</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        col4, col5, col6 = st.columns(3)
+        
+        with col4:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>🎭 Role Classification</h3>
+                <p>Identify card roles across 24 categories with explainable reasons</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col5:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>🔮 Synergy Detection</h3>
+                <p>Discover strategy packages and measure how well cards support your plan</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col6:
+            st.markdown("""
+            <div class='glass-card'>
+                <h3>⚠️ Warning System</h3>
+                <p>Unified warnings for bracket violations, mana issues, and salt triggers</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        <div style='text-align: center; padding: 2rem; color: rgba(255,255,255,0.5);'>
+            <p>👈 Enter your decklist in the sidebar to begin analysis</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        return
+    
+    # Parse and analyze
+    if not decklist_input.strip():
+        st.error("❌ Please enter a decklist")
+        return
+    
+    with st.spinner("🔄 Parsing decklist..."):
+        try:
+            deck = parse_decklist(decklist_input)
+            
+            if not deck or not deck.cards:
+                st.error("❌ Could not parse decklist. Please check format.")
+                return
+            
+            st.success(f"✅ Parsed {len(deck.cards)} cards")
+            
+        except Exception as e:
+            st.error(f"❌ Failed to parse decklist: {str(e)}")
+            return
+    
+    # Run complete analysis
+    with st.status("🔄 Running complete V2 analysis...", expanded=True) as status:
+        results = run_complete_analysis(deck, commander_name, bracket_target)
+        
+        if not results['success']:
+            status.update(label="❌ Analysis failed", state="error", expanded=True)
+            st.error(f"Error: {results.get('error', 'Unknown error')}")
+            if results.get('traceback'):
+                with st.expander("🐛 Debug Info"):
+                    st.code(results['traceback'])
+            return
+        
+        status.update(label="✅ Analysis complete!", state="complete", expanded=False)
+    
+    # Display summary metrics
+    st.markdown("## 📊 Overview")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        bracket = results['bracket']
+        bracket_emoji = "🟢" if bracket.minimum_bracket in ["B1", "B2"] else "🟡" if bracket.minimum_bracket == "B3" else "🔴"
+        st.metric("Bracket", f"{bracket_emoji} {bracket.minimum_bracket}", delta=f"{bracket.game_changer_count} GCs")
+    
     with col2:
-        # Feature showcase
-        st.markdown("""
-        <div class="glass-card" style="height: 100%;">
-            <h3 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.5rem;">
-                ✨ What You Get
-            </h3>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.8rem; margin-right: 1rem;">📊</span>
-                <strong style="color: #b8c5ff; font-size: 1.1rem;">Comprehensive Statistics</strong>
-            </div>
-            <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.95rem; margin-left: 3rem; margin-bottom: 0;">
-                Detailed mana curve, color distribution, and card type breakdowns
-            </p>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.8rem; margin-right: 1rem;">💰</span>
-                <strong style="color: #b8c5ff; font-size: 1.1rem;">Price Analysis</strong>
-            </div>
-            <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.95rem; margin-left: 3rem; margin-bottom: 0;">
-                Real-time pricing with expensive card identification
-            </p>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.8rem; margin-right: 1rem;">⚖️</span>
-                <strong style="color: #b8c5ff; font-size: 1.1rem;">Format Legality</strong>
-            </div>
-            <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.95rem; margin-left: 3rem; margin-bottom: 0;">
-                Commander and multi-format validation
-            </p>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.8rem; margin-right: 1rem;">🎯</span>
-                <strong style="color: #b8c5ff; font-size: 1.1rem;">Interaction Suite</strong>
-            </div>
-            <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.95rem; margin-left: 3rem; margin-bottom: 0;">
-                Removal, tutors, card draw, and ramp tracking
-            </p>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-size: 1.8rem; margin-right: 1rem;">⚡</span>
-                <strong style="color: #b8c5ff; font-size: 1.1rem;">Lightning Fast</strong>
-            </div>
-            <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.95rem; margin-left: 3rem; margin-bottom: 0;">
-                Complete analysis in under 30 seconds
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-    # Stats showcase
-    st.markdown("")
-    st.markdown("### 📈 By The Numbers")
-    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+        consistency = results['consistency']
+        st.metric("Consistency", f"{consistency.score:.0f}/100", delta=consistency.level)
     
-    with stat_col1:
-        st.markdown(create_metric_card("Analysis Time", "< 30s", icon="⚡"), unsafe_allow_html=True)
-    with stat_col2:
-        st.markdown(create_metric_card("Cards Database", "25,000+", icon="🃏"), unsafe_allow_html=True)
-    with stat_col3:
-        st.markdown(create_metric_card("Formats", "10+", icon="⚖️"), unsafe_allow_html=True)
-    with stat_col4:
-        st.markdown(create_metric_card("Accuracy", "99.5%", icon="🎯"), unsafe_allow_html=True)
-
-elif st.session_state.current_page == 'analysis':
-    # ===== ENHANCED ANALYSIS PAGE =====
+    with col3:
+        curve = results['curve']
+        st.metric("Curve Score", f"{curve.curve_score:.0f}/100", delta=curve.level)
     
-    # Sticky header with navigation
-    st.markdown("""
-    <div style="
-        background: rgba(10, 10, 30, 0.95);
-        backdrop-filter: blur(20px);
-        padding: 1rem 0;
-        margin: -1rem -1rem 2rem -1rem;
-        border-bottom: 2px solid rgba(102, 126, 234, 0.2);
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-    ">
-    """, unsafe_allow_html=True)
+    with col4:
+        synergy = results['synergy']
+        synergy_score = synergy.overall_score if synergy else 0
+        num_strategies = len(synergy.primary_packages) if synergy and synergy.primary_packages else 0
+        st.metric("Synergy", f"{synergy_score:.0f}/100", delta=f"{num_strategies} strategies")
     
-    col_nav, col_title = st.columns([1, 5])
-    with col_nav:
-        if st.button("🏠 Home", help="Return to landing page", use_container_width=True):
-            go_to_landing()
-            st.rerun()
-
-    with col_title:
-        st.markdown("""
-        <h1 style="
-            margin: 0;
-            font-size: 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        ">🔍 Deck Analysis Dashboard</h1>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Get deck data from session
-    decklist_content = st.session_state.deck_data
-
-    if not decklist_content:
-        st.error("No deck data found. Please return to the landing page.")
-        if st.button("🏠 Go to Landing Page"):
-            go_to_landing()
-            st.rerun()
-    else:
-        # Enhanced sidebar
-        st.sidebar.markdown("""
-        <h2 style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-        ">⚙️ Options</h2>
-        """, unsafe_allow_html=True)
+    with col5:
+        warnings = results['warnings']
+        critical_warnings = len(warnings.get_critical())
+        high_warnings = len(warnings.get_high())
+        total_warnings = len(warnings.items)
         
-        show_verbose = st.sidebar.checkbox("🔍 Show detailed errors", value=False)
-
-        # Format legality in sidebar
-        st.sidebar.markdown("<hr style='margin: 2rem 0;'/>", unsafe_allow_html=True)
-        st.sidebar.markdown("""
-        <h3 style="
-            color: #b8c5ff;
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-        ">⚖️ Format Legality</h3>
-        """, unsafe_allow_html=True)
+        if critical_warnings > 0:
+            delta_text = f"🔴 {critical_warnings} critical"
+        elif high_warnings > 0:
+            delta_text = f"🟠 {high_warnings} high"
+        else:
+            delta_text = "✅ Clean"
         
-        try:
-            format_checker = FormatChecker()
-            available_formats = format_checker.get_available_formats()
-            selected_format = st.sidebar.selectbox(
-                "Check format:",
-                ["None"] + available_formats,
-                help="Validate deck legality"
-            )
+        st.metric("Warnings", f"{total_warnings}", delta=delta_text)
+    
+    st.markdown("---")
+    
+    # Tabbed interface
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "⚠️ Warnings",
+        "📊 Bracket & Power",
+        "🎯 Consistency",
+        "📈 Curve",
+        "🎭 Roles & Synergy",
+        "📋 Card List"
+    ])
+    
+    with tab1:
+        display_warnings(results['warnings'])
+    
+    with tab2:
+        display_bracket_analysis(results['bracket'], results['tags'])
+    
+    with tab3:
+        display_consistency_analysis(results['consistency'])
+    
+    with tab4:
+        display_curve_analysis(results['curve'])
+    
+    with tab5:
+        display_roles_and_synergy(results['roles'], results['synergy'], results['card_roles'])
+    
+    with tab6:
+        display_card_list(results['card_data'], results['tags'], results['card_roles'])
 
-            if selected_format != "None":
-                format_description = format_checker.get_format_description(selected_format)
-                if format_description:
-                    st.sidebar.info(f"📋 {format_description}")
-        except Exception as e:
-            st.sidebar.error(f"❌ Error: {e}")
-            selected_format = "None"
-
-        # Parse deck
-        try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
-                temp_file.write(decklist_content)
-                temp_file_path = temp_file.name
-
-            deck = parse_decklist(temp_file_path)
-
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
-
-        except Exception as e:
-            st.error(f"Error parsing deck: {e}")
-            if st.button("🏠 Go to Landing Page"):
-                go_to_landing()
-                st.rerun()
-            st.stop()
-
-        # ===== RUN ANALYSIS =====
-        with st.spinner("🔍 Analyzing your deck..."):
-            try:
-                api = ScryfallAPI()
-                analyzer = DeckAnalyzer(api)
-                stats = analyzer.analyze(deck)
-                
-                st.success("✅ Analysis complete!")
-                
-                # Determine display name
-                display_name = None
-                if st.session_state.get('deck_name_custom'):
-                    display_name = st.session_state.deck_name_custom
-                elif deck.name and not deck.name.startswith("Tmp"):
-                    display_name = deck.name
-                else:
-                    display_name = "Your Deck"
-                
-                # Enhanced deck header
-                st.markdown(f"""
-                <div class="glass-card" style="text-align: center; margin-bottom: 3rem; padding: 2.5rem;">
-                    <h2 style="
-                        margin: 0;
-                        font-size: 3rem;
-                        background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        font-weight: 900;
-                        letter-spacing: -1px;
-                    ">🃏 {display_name}</h2>
-                    <p style="
-                        color: rgba(255, 255, 255, 0.6);
-                        margin-top: 0.5rem;
-                        font-size: 1.1rem;
-                    ">Complete Deck Analysis Report</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # ===== BASIC STATISTICS =====
-                st.markdown("### 📊 Deck Overview")
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.markdown(create_metric_card("Total Cards", stats.total_cards, icon="🃏"), unsafe_allow_html=True)
-                with col2:
-                    st.markdown(create_metric_card("Unique Cards", stats.unique_cards, icon="✨"), unsafe_allow_html=True)
-                with col3:
-                    st.markdown(create_metric_card("Lands", f"{stats.lands}", icon="🏔️"), unsafe_allow_html=True)
-                with col4:
-                    st.markdown(create_metric_card("Nonlands", f"{stats.nonlands}", icon="⚔️"), unsafe_allow_html=True)
-                
-                # ===== COLOR & CURVE =====
-                st.markdown("### 🎨 Color Distribution & Mana Curve")
-                
-                col_left, col_right = st.columns(2, gap="large")
-                
-                with col_left:
-                    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-                    if stats.color_counts:
-                        color_data = []
-                        color_labels = []
-                        color_colors_map = {
-                            'W': '#F8F6D8',
-                            'U': '#0E68AB',
-                            'B': '#150B00',
-                            'R': '#D3202A',
-                            'G': '#00733E',
-                            'C': '#BEB9B2'
-                        }
-                        
-                        for color_code, count in stats.color_counts.items():
-                            color_name = stats.color_names.get(color_code, color_code)
-                            color_labels.append(f"{color_name}")
-                            color_data.append(count)
-                        
-                        pie_colors = [color_colors_map.get(code, '#CCCCCC') for code in stats.color_counts.keys()]
-                        
-                        fig_colors = go.Figure(data=[go.Pie(
-                            labels=color_labels,
-                            values=color_data,
-                            marker=dict(
-                                colors=pie_colors,
-                                line=dict(color='#1a1a3e', width=3)
-                            ),
-                            textposition='inside',
-                            textinfo='percent',
-                            hovertemplate='<b>%{label}</b><br>%{value} cards<br>%{percent}<extra></extra>',
-                            hole=0.4
-                        )])
-                        
-                        fig_colors.update_layout(
-                            title=dict(
-                                text="Color Distribution",
-                                font=dict(size=18, color='white', family='Inter'),
-                                x=0.5,
-                                xanchor='center'
-                            ),
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            font=dict(color='white', size=13, family='Inter'),
-                            showlegend=True,
-                            legend=dict(
-                                bgcolor='rgba(0,0,0,0)',
-                                bordercolor='rgba(102, 126, 234, 0.3)',
-                                borderwidth=1,
-                                font=dict(size=12)
-                            ),
-                            margin=dict(t=60, b=20, l=20, r=20),
-                            height=400
-                        )
-                        st.plotly_chart(fig_colors, use_container_width=True)
-                    else:
-                        st.info("Colorless deck")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                with col_right:
-                    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-                    if stats.mana_curve:
-                        mana_values = []
-                        card_counts = []
-                        
-                        high_cmc_count = 0
-                        for mv in sorted(stats.mana_curve.keys()):
-                            if mv >= 7:
-                                high_cmc_count += stats.mana_curve[mv]
-                            else:
-                                mana_values.append(str(mv))
-                                card_counts.append(stats.mana_curve[mv])
-                        
-                        if high_cmc_count > 0:
-                            mana_values.append("7+")
-                            card_counts.append(high_cmc_count)
-                        
-                        fig_curve = go.Figure(data=[go.Bar(
-                            x=mana_values,
-                            y=card_counts,
-                            marker=dict(
-                                color=card_counts,
-                                colorscale=[[0, '#667eea'], [1, '#764ba2']],
-                                line=dict(color='#764ba2', width=2)
-                            ),
-                            hovertemplate='<b>CMC %{x}</b><br>%{y} cards<extra></extra>'
-                        )])
-                        
-                        fig_curve.update_layout(
-                            title=dict(
-                                text=f"Mana Curve (Avg: {stats.average_mana_value:.2f})",
-                                font=dict(size=18, color='white', family='Inter'),
-                                x=0.5,
-                                xanchor='center'
-                            ),
-                            xaxis=dict(
-                                title="Mana Value",
-                                gridcolor='rgba(102, 126, 234, 0.1)',
-                                linecolor='rgba(102, 126, 234, 0.3)',
-                                color='white'
-                            ),
-                            yaxis=dict(
-                                title="Cards",
-                                gridcolor='rgba(102, 126, 234, 0.1)',
-                                linecolor='rgba(102, 126, 234, 0.3)',
-                                color='white'
-                            ),
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            font=dict(color='white', size=13, family='Inter'),
-                            showlegend=False,
-                            margin=dict(t=60, b=60, l=60, r=20),
-                            height=400
-                        )
-                        st.plotly_chart(fig_curve, use_container_width=True)
-                    else:
-                        st.info("No mana curve data")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                # ===== CARD TYPES =====
-                st.markdown("### 🃏 Card Type Breakdown")
-                if stats.card_types:
-                    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-                    sorted_types = sorted(stats.card_types.items(), key=lambda x: -x[1])
-                    type_names = [t[0] for t in sorted_types]
-                    type_counts = [t[1] for t in sorted_types]
-                    
-                    fig_types = go.Figure(data=[go.Bar(
-                        x=type_counts,
-                        y=type_names,
-                        orientation='h',
-                        marker=dict(
-                            color=type_counts,
-                            colorscale=[[0, '#667eea'], [1, '#764ba2']],
-                            line=dict(color='#764ba2', width=2)
-                        ),
-                        hovertemplate='<b>%{y}</b><br>%{x} cards<extra></extra>'
-                    )])
-                    
-                    fig_types.update_layout(
-                        title=dict(
-                            text="Type Distribution",
-                            font=dict(size=18, color='white', family='Inter'),
-                            x=0.5,
-                            xanchor='center'
-                        ),
-                        xaxis=dict(
-                            title="Number of Cards",
-                            gridcolor='rgba(102, 126, 234, 0.1)',
-                            linecolor='rgba(102, 126, 234, 0.3)',
-                            color='white'
-                        ),
-                        yaxis=dict(
-                            gridcolor='rgba(102, 126, 234, 0.1)',
-                            linecolor='rgba(102, 126, 234, 0.3)',
-                            color='white'
-                        ),
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        font=dict(color='white', size=13, family='Inter'),
-                        showlegend=False,
-                        height=450,
-                        margin=dict(t=60, b=60, l=150, r=20)
-                    )
-                    st.plotly_chart(fig_types, use_container_width=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No card type data")
-                
-                # ===== INTERACTION SUITE =====
-                st.markdown("### 🎯 Interaction Suite")
-                if stats.interaction_counts:
-                    int_col1, int_col2, int_col3, int_col4, int_col5 = st.columns(5)
-                    
-                    interaction_types = ['Removal', 'Tutors', 'Card Draw', 'Ramp', 'Protection']
-                    interaction_icons = ['🎯', '🔍', '📚', '⚡', '🛡️']
-                    columns = [int_col1, int_col2, int_col3, int_col4, int_col5]
-                    
-                    for idx, interaction_type in enumerate(interaction_types):
-                        with columns[idx]:
-                            count = stats.interaction_counts.get(interaction_type, 0)
-                            st.markdown(
-                                create_metric_card(
-                                    interaction_type,
-                                    count,
-                                    icon=interaction_icons[idx]
-                                ),
-                                unsafe_allow_html=True
-                            )
-                            
-                            if interaction_type in stats.interaction_cards and stats.interaction_cards[interaction_type]:
-                                with st.expander("📋 View cards"):
-                                    for card in stats.interaction_cards[interaction_type]:
-                                        st.write(f"• {card}")
-                else:
-                    st.info("No interaction data")
-                
-                # ===== PRICE ANALYSIS =====
-                st.markdown("### 💰 Price Analysis")
-                if stats.total_deck_value > 0:
-                    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-                    
-                    # Big total value display
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 2rem 0;">
-                        <div style="
-                            font-size: 0.9rem;
-                            color: rgba(255, 255, 255, 0.6);
-                            text-transform: uppercase;
-                            letter-spacing: 2px;
-                            margin-bottom: 0.5rem;
-                        ">TOTAL DECK VALUE</div>
-                        <div style="
-                            font-size: 3.5rem;
-                            font-weight: 900;
-                            background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
-                            -webkit-background-clip: text;
-                            -webkit-text-fill-color: transparent;
-                        ">${stats.total_deck_value:.2f}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if stats.most_expensive_cards:
-                        st.markdown("**💎 Most Expensive Cards**")
-                        
-                        # Enhanced price table
-                        price_data = {
-                            "Card Name": [card[0] for card in stats.most_expensive_cards],
-                            "Price (USD)": [f"${card[1]:.2f}" for card in stats.most_expensive_cards]
-                        }
-                        price_df = pd.DataFrame(price_data)
-                        
-                        # Display with custom styling
-                        st.dataframe(
-                            price_df,
-                            hide_index=True,
-                            use_container_width=True,
-                            column_config={
-                                "Card Name": st.column_config.TextColumn("Card", width="large"),
-                                "Price (USD)": st.column_config.TextColumn("Price", width="medium")
-                            }
-                        )
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("Price data unavailable")
-                
-                # ===== RARITY =====
-                st.markdown("### ⭐ Rarity Breakdown")
-                if stats.rarity_counts:
-                    rarity_col1, rarity_col2, rarity_col3, rarity_col4 = st.columns(4)
-                    
-                    rarity_order = ['mythic', 'rare', 'uncommon', 'common']
-                    rarity_names = {
-                        'mythic': 'Mythic Rare',
-                        'rare': 'Rare',
-                        'uncommon': 'Uncommon',
-                        'common': 'Common'
-                    }
-                    rarity_icons = {
-                        'mythic': '🔥',
-                        'rare': '💎',
-                        'uncommon': '⭐',
-                        'common': '🔘'
-                    }
-                    rarity_columns = [rarity_col1, rarity_col2, rarity_col3, rarity_col4]
-                    
-                    for idx, rarity in enumerate(rarity_order):
-                        if rarity in stats.rarity_counts:
-                            count = stats.rarity_counts[rarity]
-                            percentage = (count / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
-                            with rarity_columns[idx]:
-                                st.markdown(
-                                    create_metric_card(
-                                        rarity_names[rarity],
-                                        f"{count}",
-                                        icon=rarity_icons[rarity]
-                                    ),
-                                    unsafe_allow_html=True
-                                )
-                else:
-                    st.info("No rarity data")
-                
-                # ===== FORMAT LEGALITY =====
-                if selected_format != "None":
-                    st.markdown(f"### ⚖️ Format Legality: {selected_format}")
-                    
-                    with st.spinner(f"Checking {selected_format} legality..."):
-                        try:
-                            legality_report = format_checker.check_deck_legality(deck, selected_format)
-                            
-                            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-                            if legality_report.legal:
-                                st.success(legality_report.get_summary())
-                            else:
-                                st.error(legality_report.get_summary())
-                            
-                            if legality_report.issues:
-                                with st.expander(f"❌ Errors ({len(legality_report.issues)})", expanded=not legality_report.legal):
-                                    for issue in legality_report.issues:
-                                        st.error(f"**{issue.category.upper()}**: {issue.message}")
-                                        if issue.card_name:
-                                            st.write(f"   Card: {issue.card_name}")
-                                        if issue.suggestion:
-                                            st.info(f"   💡 {issue.suggestion}")
-                            
-                            if legality_report.warnings:
-                                with st.expander(f"⚠️ Warnings ({len(legality_report.warnings)})"):
-                                    for warning in legality_report.warnings:
-                                        st.warning(f"**{warning.category.upper()}**: {warning.message}")
-                                        if warning.suggestion:
-                                            st.info(f"   💡 {warning.suggestion}")
-                            
-                            if legality_report.info:
-                                with st.expander(f"ℹ️ Information ({len(legality_report.info)})"):
-                                    for info in legality_report.info:
-                                        st.info(f"{info.message}")
-                            
-                            st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-                            if show_verbose:
-                                st.exception(e)
-                
-                # ===== MISSING CARDS =====
-                if stats.missing_cards:
-                    st.markdown("### ⚠️ Missing Cards")
-                    st.warning(f"Could not find {len(stats.missing_cards)} cards")
-                    
-                    with st.expander("View missing cards"):
-                        for card in stats.missing_cards:
-                            st.write(f"• {card}")
-                
-                # ===== SUCCESS SUMMARY =====
-                success_rate = ((stats.unique_cards - len(stats.missing_cards)) / stats.unique_cards * 100) if stats.unique_cards > 0 else 0
-                st.success(f"✅ Successfully analyzed {success_rate:.1f}% of cards")
-                
-            except Exception as e:
-                st.error(f"❌ Analysis error: {e}")
-                if show_verbose:
-                    st.exception(e)
-
-else:
-    st.session_state.current_page = 'landing'
-    st.rerun()
-
-# Enhanced footer
-st.markdown("<br/><br/>", unsafe_allow_html=True)
-st.markdown("""
-<div class="glass-card" style="text-align: center; margin-top: 4rem;">
-    <p style="
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 1rem;
-        margin-bottom: 1rem;
-    ">Built with ❤️ for the MTG community</p>
-    <div style="
-        display: flex;
-        justify-content: center;
-        gap: 3rem;
-        flex-wrap: wrap;
-        margin-top: 1.5rem;
-    ">
-        <a href="https://streamlit.io" target="_blank" style="
-            color: #b8c5ff;
-            text-decoration: none;
-            font-weight: 700;
-            transition: all 0.3s ease;
-            font-size: 1.05rem;
-        ">⚡ Powered by Streamlit</a>
-        <a href="https://scryfall.com/docs/api" target="_blank" style="
-            color: #b8c5ff;
-            text-decoration: none;
-            font-weight: 700;
-            transition: all 0.3s ease;
-            font-size: 1.05rem;
-        ">🃏 Data from Scryfall API</a>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
