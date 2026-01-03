@@ -7,6 +7,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Iterable, Dict, Any, Set, List, Optional
 
+from utils import canonicalize_name
+from card_lists import (
+    GAME_CHANGERS_V11,
+    FAST_MANA,
+    MLD_CARDS,
+    STAX_PIECES,
+    EXTRA_TURN_CARDS,
+    INFINITE_COMBO_PIECES,
+)
+
 
 # ===== TYPES =====
 
@@ -259,74 +269,56 @@ def rule_simple_oracle_signals(card: Card) -> TagSet:
 
 
 def rule_game_changers(card: Card) -> TagSet:
-    """Tag known Game Changer cards."""
-    # This list should match your bracket.py game changers list
-    name = _lower(_s(card, "name"))
+    """Tag known Game Changer cards using official v1.1 list from card_lists.py."""
+    name = canonicalize_name(_s(card, "name"))
     
-    GAME_CHANGERS = {
-        "ancient tomb", "mana crypt", "jeweled lotus", "grim monolith", "mana vault",
-        "chrome mox", "mox diamond", "mox opal", "lion's eye diamond", "lotus petal",
-        "rhystic study", "mystic remora", "smothering tithe", "necropotence",
-        "esper sentinel", "trouble in pairs", "phyrexian arena",
-        "demonic tutor", "vampiric tutor", "imperial seal", "mystical tutor",
-        "enlightened tutor", "worldly tutor", "gamble",
-        "force of will", "force of negation", "fierce guardianship", "deflecting swat",
-        "pact of negation", "mana drain", "swan song", "counterspell",
-        "swords to plowshares", "path to exile", "anguished unmaking", "generous gift",
-        "beast within", "chaos warp", "cyclonic rift", "deadly rollick",
-        "dockside extortionist", "thassa's oracle", "underworld breach",
-        "ad nauseam", "peer into the abyss", "necrologia",
-        "wheel of fortune", "timetwister", "time spiral", "echo of eons",
-        "craterhoof behemoth", "triumph of the hordes", "finale of devastation",
-        "expropriate", "insurrection"
-    }
-    
-    if name in GAME_CHANGERS:
+    if name in GAME_CHANGERS_V11:
         return {"game_changer"}
     return set()
 
 
 def rule_fast_mana(card: Card) -> TagSet:
-    """Tag fast mana (0-1 CMC that produces mana)."""
+    """Tag fast mana using shared list from card_lists.py."""
     tags: TagSet = set()
+    name = canonicalize_name(_s(card, "name"))
+    
+    # Check against authoritative fast mana list
+    if name in FAST_MANA:
+        tags.add("fast_mana")
+        return tags
+    
+    # Fallback: heuristic detection for cards not on list
     mv = _cmc(card)
     t = _lower(_oracle_text(card))
     
     if mv <= 1 and ("add " in t and any(mana in t for mana in ["{g}", "{u}", "{b}", "{r}", "{w}", "{c}"])):
         tags.add("fast_mana")
     
-    # Also tag known fast mana by name
-    name = _lower(_s(card, "name"))
-    if name in {"mana crypt", "jeweled lotus", "chrome mox", "mox diamond", 
-                "mox opal", "mox amber", "lion's eye diamond", "lotus petal",
-                "sol ring", "mana vault", "ancient tomb"}:
-        tags.add("fast_mana")
-    
     return tags
 
 
 def rule_problematic_cards(card: Card) -> TagSet:
-    """Tag cards that commonly cause salt/issues."""
+    """Tag cards that commonly cause salt/issues using shared lists from card_lists.py."""
     tags: TagSet = set()
-    name = _lower(_s(card, "name"))
+    name = canonicalize_name(_s(card, "name"))
     t = _lower(_oracle_text(card))
     
-    # Extra turns
+    # Check against authoritative lists first
+    if name in MLD_CARDS:
+        tags.add("mld")
+    if name in STAX_PIECES:
+        tags.add("stax")
+    if name in EXTRA_TURN_CARDS:
+        tags.add("extra_turns")
+    if name in INFINITE_COMBO_PIECES:
+        tags.add("infinite_combo")
+    
+    # Fallback: heuristic detection for cards not on lists
     if "take an extra turn" in t or "extra turn" in t:
         tags.add("extra_turns")
-    if name in {"time warp", "temporal manipulation", "time stretch"}:
-        tags.add("extra_turns")
-    
-    # Mass land destruction
     if "destroy all lands" in t or "destroy all land" in t:
         tags.add("mld")
-    if name in {"armageddon", "ravages of war", "jokulhaups", "obliterate"}:
-        tags.add("mld")
-    
-    # Stax pieces
     if any(pattern in t for pattern in ["players can't", "opponents can't", "skip your untap", "can't untap"]):
-        tags.add("stax")
-    if name in {"winter orb", "static orb", "trinisphere", "rule of law"}:
         tags.add("stax")
     
     return tags

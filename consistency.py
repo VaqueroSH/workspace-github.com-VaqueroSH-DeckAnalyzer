@@ -7,7 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Dict, Set, Iterable
-import re
+
+from utils import canonicalize_name as _canon
 
 
 class ConsistencyLevel(Enum):
@@ -139,20 +140,6 @@ FREE_INTERACTION = {
     "disrupting shoal", "thwart", "foil", "daze", "submerge",
     "snapback", "slaughter pact", "intervention pact", "summoner's pact",
 }
-
-
-def _canon(name: str) -> str:
-    """Canonicalize card name for matching"""
-    import unicodedata
-    if not name:
-        return ""
-    name = unicodedata.normalize("NFKD", name)
-    name = "".join(ch for ch in name if not unicodedata.combining(ch))
-    name = name.casefold()
-    name = name.replace("'", "'").replace("'", "'").replace(""", '"').replace(""", '"')
-    name = re.sub(r"[^a-z0-9 ,'-]+", " ", name)
-    name = re.sub(r"\s+", " ", name).strip()
-    return name
 
 
 def _count_matches(deck_cards: Iterable[str], reference_set: Set[str]) -> int:

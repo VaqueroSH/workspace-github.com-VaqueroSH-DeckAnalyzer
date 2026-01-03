@@ -80,6 +80,16 @@ class CurveEvalResult:
     
     # Breakdown for transparency
     score_breakdown: Dict[str, int]
+    
+    @property
+    def level(self) -> str:
+        """Return curve level as string for UI display."""
+        return self.curve_level.value.title()
+    
+    @property
+    def mv_distribution(self) -> Dict[int, int]:
+        """Alias for mv_hist for UI compatibility."""
+        return self.mv_hist
 
 
 @dataclass

@@ -314,7 +314,8 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
         
         # Step 3: Bracket Analysis
         st.write("📊 Evaluating bracket...")
-        bracket_result = evaluate_bracket(card_data)
+        card_names = [c['name'] for c in card_data]
+        bracket_result = evaluate_bracket(card_names)
         results['bracket'] = bracket_result
         
         # Step 4: Role Classification
@@ -402,7 +403,7 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
                     commander_card = c
                     break
         
-        synergy_result = evaluate_synergy(card_data, counts, commander=commander_card)
+        synergy_result = evaluate_synergy(card_data, counts, commander_cards=[commander_card] if commander_card else None)
         results['synergy'] = synergy_result
         
         # Step 8: Generate Warnings
@@ -556,7 +557,7 @@ def display_consistency_analysis(consistency_result: ConsistencyResult):
         <div class='glass-card' style='text-align: center;'>
             <h2 style='font-size: 5rem; margin: 2rem 0; color: {score_color};'>{consistency_result.score:.0f}</h2>
             <p style='font-size: 1.5rem; color: rgba(255,255,255,0.7);'>Consistency Score</p>
-            <p style='font-size: 1.2rem; color: rgba(255,255,255,0.5); margin-top: 1rem;'>{consistency_result.level}</p>
+            <p style='font-size: 1.2rem; color: rgba(255,255,255,0.5); margin-top: 1rem;'>{consistency_result.level.value}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -867,7 +868,7 @@ def main():
     
     with col2:
         consistency = results['consistency']
-        st.metric("Consistency", f"{consistency.score:.0f}/100", delta=consistency.level)
+        st.metric("Consistency", f"{consistency.score:.0f}/100", delta=consistency.level.value)
     
     with col3:
         curve = results['curve']
