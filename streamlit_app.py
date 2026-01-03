@@ -344,9 +344,11 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
         curve_cards = [
             CurveCard(
                 name=c['name'],
-                mv=c['cmc'],
-                oracle_text=c['oracle_text'],
+                cmc=c['cmc'],
                 type_line=c['type_line'],
+                oracle_text=c['oracle_text'],
+                colors=set(c.get('colors', [])),
+                mana_cost=c.get('mana_cost', ''),
                 qty=c['quantity']
             )
             for c in card_data
