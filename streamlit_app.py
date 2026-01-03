@@ -386,7 +386,7 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
         land_count = sum(1 for c in card_data if 'Land' in c['type_line'])
         
         consistency_result = calculate_consistency(
-            deck_cards=card_data,
+            deck_cards=[c['name'] for c in card_data],
             role_distribution=role_dist,
             avg_cmc=avg_cmc,
             land_count=land_count
