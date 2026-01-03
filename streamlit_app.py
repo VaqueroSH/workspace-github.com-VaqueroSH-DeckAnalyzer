@@ -284,7 +284,10 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
         
         for i, card in enumerate(deck.cards):
             try:
-                card_info = api.get_card(card.name)
+                # Handle both string and object formats
+                card_name = card if isinstance(card, str) else card.name
+                
+                card_info = api.get_card(card_name)
                 if card_info:
                     card_data.append({
                         'name': card_info.name,
@@ -299,7 +302,8 @@ def run_complete_analysis(deck, commander_name: str, bracket_target: str) -> Dic
                     })
                 progress_bar.progress((i + 1) / total_cards)
             except Exception as e:
-                st.warning(f"⚠️ Could not fetch {card.name}: {str(e)}")
+                card_name = card if isinstance(card, str) else card.name
+                st.warning(f"⚠️ Could not fetch {card_name}: {str(e)}")
         
         results['card_data'] = card_data
         
