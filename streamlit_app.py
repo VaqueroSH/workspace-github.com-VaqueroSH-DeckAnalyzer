@@ -568,10 +568,10 @@ def display_consistency_analysis(consistency_result: ConsistencyResult):
         st.markdown("**Component Breakdown**")
         
         components = [
-            ("Card Access", consistency_result.metrics.access_score, 30),
-            ("Redundancy", consistency_result.metrics.redundancy_score, 25),
-            ("Mana Base", consistency_result.metrics.mana_score, 25),
-            ("Speed", consistency_result.metrics.speed_score, 15)
+            ("Card Access", consistency_result.breakdown.get('access', 0), 30),
+            ("Redundancy", consistency_result.breakdown.get('redundancy', 0), 25),
+            ("Mana Base", consistency_result.breakdown.get('mana', 0), 25),
+            ("Speed", consistency_result.breakdown.get('speed', 0), 15)
         ]
         
         for name, score, max_score in components:
