@@ -25,7 +25,7 @@ from tagger import tag_many, filter_by_tag, count_tag
 # Import existing modules
 from scryfall_api import ScryfallAPI
 from deck_parser import parse_decklist
-from models import Card
+
 
 # Initialize API
 api = ScryfallAPI()
