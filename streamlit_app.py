@@ -10,10 +10,22 @@ import plotly.graph_objects as go
 import tempfile
 import os
 
-from scryfall_api import ScryfallAPI
-from deck_parser import parse_decklist
-from models import DeckAnalyzer
-from format_checker import FormatChecker
+from Core_code.scryfall_api import ScryfallAPI
+from Core_code.deck_parser import parse_decklist
+from Core_code.models import DeckAnalyzer
+from Core_code.format_checker import FormatChecker
+
+# V2 Analysis Modules
+from Core_code.bracket import evaluate_bracket, BracketResult
+from Core_code.consistency import calculate_consistency, ConsistencyResult
+from Core_code.curve_eval import evaluate_curve, Card as CurveCard, EvalContext
+from Core_code.roles import assign_roles, summarize_roles, Deck as RoleDeck, Card as RoleCard, Role
+from Core_code.synergy import evaluate_synergy, generate_synergy_summary
+from Core_code.deck_warnings import (
+    WarningContext, evaluate_warnings, detect_problematic_cards, 
+    Severity, generate_warnings_summary
+)
+from Core_code.tagger import tag_many, filter_by_tag, count_tag
 
 # Page configuration
 st.set_page_config(
